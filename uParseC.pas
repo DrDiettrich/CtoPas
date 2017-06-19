@@ -261,12 +261,7 @@ string_literal
       opLPar: // ( here: call!
         begin
           ParserFlags := ParserFlags + [pfNotConst, pfCode];  //unless intrinsic!?
-        {$IFDEF old} //fn-name(args) !!! not only name, expr's as well!!!
-          Result := Result + '('; // startOp;
-          nextToken;
-        {$ELSE}
           Result := addArg(startOp, Result);  // "(("proc
-        {$ENDIF}
           if i_ttyp = opRPar then  //"("
           //empty argument list
             Result := endItem(Result) // ((proc)
@@ -303,13 +298,6 @@ postfix_expression
   begin
     case i_TTYP of
     //t_num,  //requires conversion!
-  {$IFDEF old}
-    opINC, opDec: //here: prefix! equivalent to arg+=1 [for lhs arg!]
-      begin //op(arg) denotes prefix, op(1,arg) denotes postfix
-        Result := startOp;
-        Result := endOp(Result, unary_expression);
-      end;
-  {$ELSE}
     opINC: //here: prefix! equivalent to arg+=1 [for lhs arg!]
       begin //+=(arg) denotes prefix, ++(arg) denotes postfix
         ParserFlags := ParserFlags + [pfNotConst, pfCode];
@@ -317,13 +305,12 @@ postfix_expression
         Result := endOp(Result, unary_expression);
           //no second arg stored, defaults to 1.
       end;
-    opDec: //here: prefix! equivalent to arg+=1 [for lhs arg!]
+    opDec: //here: prefix! equivalent to arg-=1 [for lhs arg!]
       begin //-=(arg) denotes prefix, --(arg) denotes postfix
         ParserFlags := ParserFlags + [pfNotConst, pfCode];
         Result := '-=('; nextToken;
         Result := endOp(Result, unary_expression);
       end;
-  {$ENDIF}
     opADD:  //+ here: unary!
       begin
         nextToken;
@@ -1257,16 +1244,12 @@ var
     Result := expect(opLPar, 'no "("parameter list)');
     if not Result then
       exit;
-  {$IFDEF old}
-    pr.Clear;
-  {$ELSE}
   //try prevent scope creation for external procedures - storage here valid???
   //external storage *only* known on ";" instead of "{"!!!
     if r.storage <> Kextern then begin
       r.makeScope;
       pr.Create(r.mbrScope);
     end;
-  {$ENDIF}
     //if i_ttyp <> opRPar then begin
     Result := skip(opRPar);
     if Result then begin

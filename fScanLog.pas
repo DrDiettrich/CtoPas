@@ -157,12 +157,7 @@ uses
 type
   TFilePos = class
   public
-  {$IFDEF old}
-    f:  TFile;
-    l:  integer;
-  {$ELSE}
     loc: RFileLoc;
-  {$ENDIF}
     constructor Create(AFile: TFile; ALine: integer);
   end;
 

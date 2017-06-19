@@ -38,15 +38,9 @@ type
   public
     ModuleName: string;
     ProjectDir: string;
-  {$IFDEF old}
-    //constructor ForHeader(const fn: string; fSort: boolean = false);
-    constructor ForHeader(const fn: string);
-    constructor ForModule(mf: TModule);
-  {$ELSE}
     procedure ForHeader(const fn: string);
     procedure ForScope(AScope: TScope);
     procedure ForModule(mf: TModule);
-  {$ENDIF}
     destructor  Destroy; override;
       //handle owned dst
     property  Target: TStrings read dst write SetTarget;
@@ -393,19 +387,6 @@ begin
   WriteLn(s);
   inc(indent);
 end;
-
-{$IFDEF old}
-constructor TTranslator.ForHeader(const fn: string);
-begin
-...
-end;
-
-constructor TTranslator.ForModule(mf: TModule);
-begin
-...
-end;
-{$ELSE}
-{$ENDIF}
 
 initialization
   AllSyms := TDupeList.Create('dupes');

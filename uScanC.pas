@@ -177,11 +177,7 @@ const
   Alpha = ['A'..'Z', 'a'..'z'];
   AlNum = Digits + Alpha;
   SymFirst = Alpha + ['_'];
-{$IFDEF old}
-  SymNext = SymFirst + Digits;
-{$ELSE}
   SymNext = SymFirst + Digits + ['$'];  //mangled names!
-{$ENDIF}
   FltExp = ['e', 'E']; //['d', 'D', 'e', 'E', 'f', 'F'];  //what's really acceptable?
   FltPunct = FltExp + ['.'];
 
@@ -1239,18 +1235,10 @@ begin //handleDirective - called at '#'
   if not fError then begin
     Result := ScanToken.kind;
     if not (Result in [t_eof, t_err, t_bol]) then begin
-    {$IFDEF old}
-      Result := self._nextRaw(False, smEol);
-      if Result = t_rem then
-        Result := t_empty;  //don't show tokens, by default.
-        //if the text is to be shown, the application can test the
-        //ScanToken.kind for t_rem?
-    {$ELSE}
     //at least #pragma can have continuation lines
       repeat
         Result := self._nextRaw(True, smStd);
       until Result in [t_eof, {t_err,} t_bol];
-    {$ENDIF}
     end;
   end;  //else #error directive, return as scanned.
   if FLockDelay then begin

@@ -47,13 +47,9 @@ const //todo: show macros from new deffile format!!!
 procedure ToPas(const fn: string; fSort: boolean = false);
 //procedure CheckNames(filename: string);
 //function  ExpressionString(leftOp: eToken): string;
-{$IFDEF old}
-function  PascalStringLit(const s: string): string;
-{$ELSE}
 function  AnsiToPascal(const s: string): string;
 function  AnsiToP(const s: string; delim: char; fLong: boolean): string;
   //callback for TokenString
-{$ENDIF}
 
 {$IFDEF new}
 function  CheckMeta(mf: TModule): boolean;
@@ -265,11 +261,7 @@ const
     (n:': '; t:poErr), //opColon: label!
     (n:''; t:poDone), //opSemi, // , : ; C++: ::
   {$ELSE}
-    {$IFDEF old}
-      (n:''; t:poStop), //opLPar,
-    {$ELSE}
-      (n:'('; t:poCall; p:prLowest), //opLPar,  //prio???
-    {$ENDIF}
+    (n:'('; t:poCall; p:prLowest), //opLPar,  //prio???
     (n:''; t:poStop), //opRPar, // ( )
     (n:''; t:poSep), //opComma: consume and exit
     (n:''; t:poStop), //opColon: label!
@@ -730,17 +722,10 @@ begin //ExpressionString
       expect(opLPar, 'no argument list');  //skip "("
       //Result := aPasOp[op].n;
       Result := ExpressionString(op); //prio???
-    {$IFDEF old}
-      if i_ttyp <> opRPar then begin  //empty arg-list?
-        expect(opComma, 'bad argument list');
-        Result := Result + '(' + ExprList + ')';  //stop on ")"
-      end;
-    {$ELSE}
       if skip(opComma) then
         Result := Result + '(' + ExprList + ')'  //stop on ")"
       else if fEmptyCall then
         Result := Result + '()';  //show empty argument list
-    {$ENDIF}
       expect(opRPar, 'no op(...")"');
     end;
   {
@@ -864,11 +849,7 @@ var
     SetString(n, pd, pc - pd);  //assume delim is not the first char!
 
   //don't unify local names (for now)
-  {$IFDEF old}
-    Write(n + '$1');
-  {$ELSE}
     Write(n);
-  {$ENDIF}
   end;
 
 begin
@@ -2248,16 +2229,9 @@ var
     ReadLn(fin, ln);
     if fNew then begin
     //c[ln]<tab>...
-    {$IFDEF old}
-      i := Pos(#9, ln);
-      i := PosEx(#9, ln, i+1);
-      symc := ln[i+1];  //type character
-      ln := Copy(ln, i+2, Length(ln));
-    {$ELSE}
       symc := ln[1];
       i := Pos(#9, ln);
       ln := Copy(ln, i+1, Length(ln));
-    {$ENDIF}
     end;
     Result := symc < 'a';
     if Result then begin
@@ -2395,30 +2369,6 @@ begin //ToPas
   if XToPas.hToPas(fn, '') then begin
     XToPas.Target.SaveToFile(XToPas.ModuleName + '.pas');
   end;
-{$IFDEF old}
-  if fUniqueNames then
-    CheckNames('');
-  s := ChangeFileExt(fn, '.pas');
-  AssignFile(f, s);
-  Rewrite(f);
-  curkind := stUnknown;
-  typeswritten := False;
-  try
-    WriteHeader;
-    if fSort then begin
-      WriteAllTypes(Globals);
-      WriteAllConsts(Globals);
-      WriteAllVars(Globals);
-      WriteAllProcs(Globals);
-    end else
-      WriteIntf(Globals);
-  //ToDo: Macros should go to both interface and implementation!!!
-    WriteImpl;
-  finally
-    CloseFile(f);
-  end;
-{$ELSE}
-{$ENDIF}
 end;
 
 {$IFDEF new}

@@ -62,19 +62,12 @@ begin //ShowUnsorted;
   //prevent dupes?
 //add all macro symbols
   for i := 0 to Symbols.Count - 1 do begin
-  {$IFDEF old}
-    mac := Symbols.getSymbol(i);
-    if (mac <> nil) and (mac.FObject <> nil)
-    and (mac.FMacro.altID = 0) then //only non-C symbols
-      lbSyms.Items.AddObject(mac.FString, mac.FObject);
-  {$ELSE}
     mac := Symbols.getSymbol(i);
     if mac <> nil then begin
       sym := mac.GetMacro;
       if (sym <> nil) and (sym.altID = 0) then
         lbSyms.Items.AddObject(mac.FString, mac.FObject);
     end;
-  {$ENDIF}
   end;
 //other symbols
   addSyms(Globals);

@@ -139,15 +139,8 @@ type
   //TSymMacro = class(TXStrings)
   TSymMacro = class(TSymbol)
   public
-  {$IFDEF old}
-    altID:    integer;  //for non-macros: typeless index of symbol entry
-    loc:  RFileLoc;
-    function  toString: string; virtual;  //full (meta) string
-    function  BodyString: string; virtual;  //definition (tokens, only)
-  {$ELSE}
     //in TSymbol
     function  BodyString: string; override;  //definition (tokens, only)
-  {$ENDIF}
     constructor Create(const AName: string; AKey: integer = 0); override;
     destructor  Destroy; override;  //destroy token array
   //real macros only!
@@ -275,24 +268,12 @@ end;
 
 procedure resetTables;
 begin
-{$IFDEF old}
-  if numSyms = 0 then
-    Symbols.Clear
-  else
-    Symbols.Pop(Symbols.Count - numSyms);
-  if numStrings = 0 then begin
-    StringTable.Clear;
-    StringTable.Add('');  //String ID = 0
-  end else  //can this happen???
-    StringTable.Capacity := numStrings;
-{$ELSE}
   if numSyms = 0 then
     fixTables
   else begin
     Symbols.Pop(Symbols.Count - numSyms);
     StringTable.Capacity := numStrings;
   end;
-{$ENDIF}
   Files.Clear;
   IncludePath.Clear;
 //problem: what if ConfigFiles not initialized by application?
@@ -476,24 +457,6 @@ begin
     Result := self.GetTokens.DefString(nil);
 end;
 
-{$IFDEF old}
-function TSymMacro.GlobalID: integer;
-begin
-  Result := self.altID; //if global: in Globals table
-end;
-
-function TSymMacro.UniqueID: integer;
-begin
-  Result := self.ListIndex; //in preprocessor table
-end;
-
-function TSymMacro.toString: string;
-begin
-  Result := name + BodyString;
-end;
-{$ELSE}
-  //default in TSymbol
-{$ENDIF}
 
 { TTokenStream }
 

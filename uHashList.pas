@@ -99,14 +99,7 @@ type
   end;
 
 //sample container class
-{$IFDEF old}
-  THashedObject = object(THashItem)
-  public
-    FObject: TObject;
-  end;
-{$ELSE}
   THashedObject = THashItem;
-{$ENDIF}
 
   THashList = class(TStrings)
   protected

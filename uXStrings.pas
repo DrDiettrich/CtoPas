@@ -49,17 +49,8 @@ type
   end;
 
 //extend hash item
-{$IFDEF old}
-  TXHashItem = Object(THashItem)
-  public
-    FMember:  TXStrings;
-  end;
-  PXHashItem = ^TXHashItem;
-  TXHashGetItem = function(index: integer): PXHashItem;
-{$ELSE}
   TXHashItem = THashItem;
   PXHashItem = PHashItem;
-{$ENDIF}
 
   TXCustomHashList = class(TXStrings)
   protected
@@ -107,13 +98,7 @@ type
   protected //implement default item array
     Items: array of TXHashItem;
   //callbacks, virtual for any derived THashItem descriptors
-  {$IFDEF old}
     function  GetItem(index: integer): PXHashItem; override;
-    function  GetHashItem(index: integer): PHashItem;
-      //D4 doesn't allow for casting :-(
-  {$ELSE}
-    function  GetItem(index: integer): PXHashItem; override;
-  {$ENDIF}
     function  Resize(newCapacity: integer): integer; override;
   public
     constructor Create(const AName: string; AKey: integer = 0); override;
@@ -323,21 +308,13 @@ begin
 {$ELSE}
   if (Index < 0) or (Index >= FList.FCount) then Error(SListIndexError, Index);
 {$ENDIF}
-{$IFDEF old}
-    Result := GetItem(index).FMember;
-{$ELSE}
     TObject(Result) := GetItem(index).FObject;
-{$ENDIF}
 end;
 
 function TXCustomHashList.GetObject(Index: integer): TObject;
 begin
   if (Index < 0) or (Index >= FList.FCount) then Error(SListIndexError, Index);
-{$IFDEF old}
-    Result := GetItem(index).FMember;
-{$ELSE}
     TObject(Result) := GetItem(index).FObject;
-{$ENDIF}
 end;
 
 function TXCustomHashList.IndexOf(const S: string): Integer;
@@ -417,14 +394,6 @@ begin
   FList.Resize := Resize;
   inherited;
 end;
-
-{$IFDEF old}
-function TXStringList.GetHashItem(index: integer): PHashItem;
-begin //callback
-  PXHashItem(Result) := @Items[index];
-end;
-{$ELSE}
-{$ENDIF}
 
 function TXStringList.GetItem(index: integer): PXHashItem;
 begin //internal use

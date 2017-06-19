@@ -454,11 +454,7 @@ other - local
     procedure makeTagRef(sue: eKey; const tag: string);
     procedure setNameSym; //from ScanSym
     procedure propagateName(const t: RType);
-  {$IFDEF old}
-    procedure makeTypeRef(const tn: string);
-  {$ELSE}
     procedure type_specifier(i_ttyp: eToken; fDefault: boolean);
-  {$ENDIF}
     procedure makeDim(const dim: string);
     procedure makePointer;
     function  qualify(t: eKey; fSpec: boolean): boolean; //const or volatile
@@ -467,13 +463,8 @@ other - local
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
     function  makeStructMember(const t: RType): TSymbolC;
-  {$IFDEF old}
-    procedure makeParam(const t: RType);
-    procedure makeVararg;
-  {$ELSE}
     function  makeParam(const t: RType): string;
     function  makeVararg: string;
-  {$ENDIF}
     //procedure makeParams;
     procedure makeParams(const params: string);
   {$ELSE} //no local scopes
@@ -536,15 +527,6 @@ const
   //PublicScope = 'p';
 //lists
 const
-{$IFDEF old}
-  ListTerm = ',';
-  ExpTerm = ';'
-  ExpSep = '';
-  ListTermT = opComma;
-  ExpTermT = opSemi;
-  BitFieldStart = '<';
-  BitFieldEnd = '>';
-{$ELSE}
   ListTerm = ';';
   ListTermT = opSemi;
   {$IFDEF ExprTerm}
@@ -560,7 +542,6 @@ const
     ExpTermT = t_empty;
     ExpSep = ',';
   {$ENDIF}
-{$ENDIF}
 
 var
   TypePrefix: string; //= 'T';
@@ -1189,18 +1170,10 @@ var
       exit;
   //strip start of body, if present
   { TODO : check proc fmt decoding }
-  {$IFDEF old}
-    if t[Length(t)] = '{' then begin
-      SetLength(t, Length(t) - 1);  //or always strip last char?
-      v := '{';
-    end
-  {$ELSE}
     if t[Length(t)] = '(' then begin
       SetLength(t, Length(t) - 2);
       v := '{(';
-    end
-  {$ENDIF}
-    else
+    end else
       v := '';
   end;
 
@@ -1460,28 +1433,6 @@ procedure TTypeDefs.SaveToStream(Stream: TStream);
     Stream.Write(EOLstr, Length(EOLstr));
   end;
 
-{$IFDEF old}
-  procedure SaveDefines;
-  var
-    i: integer;
-    sym:  PSymPrep;
-  begin
-    for i := 0 to Symbols.Count - 1 do begin
-      sym := Symbols.getSymbol(i);
-      if (sym.mackind = skMacro) then begin  //suppress constants etc!
-        if sym.FObject <> nil then begin
-          WriteLn('#define'#9 + TMacro(sym.FMacro).toString, False);
-        end else if fDebug then begin
-        //WriteLn('//#define'#9 + TMacro(sym.FMember).name + '???', False);
-          WriteLn('//#define'#9 + sym.FString + '???', False);
-        end;
-      end;
-    end;
-  end;
-{$ELSE}
-{$ENDIF}
-
-
 (*
 Most important is the order of HLL symbol definitions!
   (names can be used before, as parameter names...)
@@ -1552,13 +1503,7 @@ The Globals table is dumped in order,
               if psym.appkind <> t_empty then begin
               //write tokenstring?
               end else begin
-              {$IFDEF old}
-                s := IntToHex(nextMac,4) + #9 + #9
-                  + aSymbolKind[psym.mackind] + psym.FString;
-                WriteLn(s, Length(s) > 1000);
-              {$ELSE}
                 WriteBug(IntToHex(nextMac,4), aSymbolKind[psym.mackind] + psym.FString);
-              {$ENDIF}
               end;
             end;
           end;
@@ -1570,12 +1515,7 @@ The Globals table is dumped in order,
     procedure logBug;
     begin
     //error??? - should never occur
-    {$IFDEF old}
-      s := #9 + IntToHex(i,4) + #9;
-      WriteLn(s, False);
-    {$ELSE}
       WriteBug(IntToHex(i,4), '???');
-    {$ENDIF}
     end;
 
     procedure WriteCSym(c: char; const l: string);
@@ -1614,11 +1554,7 @@ The Globals table is dumped in order,
         if csym = nil then begin
           logBug;
         end else begin
-        {$IFDEF old}
-          WriteCSym(aSymType[csym.kind], csym.GetCaption); //really Caption???
-        {$ELSE}
           WriteCSym(aSymType[csym.kind], csym.toString);
-        {$ENDIF}
         end;
       except
         logBug;
@@ -1668,56 +1604,6 @@ begin
 end;
 
 function TTypeDefs.closestType(const ADef: string): string;
-{$IFDEF old}
-var
-  sym:  TSymbolC;
-
-  function  lookup(const ADef: string): boolean;
-  var
-    i: integer;
-  begin
-    for i := 0 to Count - 1 do begin
-      sym := Self.getSym(i);
-      Result := (sym.kind = stTypedef) and (sym.Def = ADef);
-      if Result then
-        exit;
-    end;
-    Result := False;
-  end;
-
-var
-  i:  integer;
-begin //try find typename - synthesize if required?
-  if lookup(ADef) then
-    Result := sym.name
-  else begin
-  //try create canonical name
-    Result := '';
-    for i := 1 to Length(ADef) do begin
-      if (ADef[i] = '*')
-      and lookup(copy(ADef, i+1, Length(ADef) - i)) then begin
-        Result := '__T' + StringOfChar('p', i) + sym.name;
-        break;
-      end;
-    end;
-  //check found
-    if Result = '' then begin
-    //check standard types
-      if ADef = '*v' then
-        Result := 'PVOID'
-      else if ADef = '*c' then
-        Result := 'PCHAR'
-      else
-        Result := '__T' + IntToStr(Count);
-    //create new typedef - add to Symbols
-      i := Symbols.Add(Result);
-      sym := self.defType(Result, ADef, i);
-    end;
-  end;
-//finish
-  //Result := quoteType(Result);
-end;
-{$ELSE}
 const
   BaseTypeChars = 'vcwsilLfdD';  //-+"';
   BaseTypeNames: array[1..10] of string = (
@@ -1779,7 +1665,6 @@ begin //try find typename - synthesize if required?
   i := Symbols.Add(Result);
   sym := self.defType(Result, ADef, i);
 end;
-{$ENDIF}
 
 { RType }
 
@@ -1970,26 +1855,6 @@ begin
   end else //debug only?
     basetype := nil;  //missing???
 end;
-
-{$IFDEF old}
-(* makeTypeRef
-  Declarator references an named type.
-  Add the typename to spec.
-*)
-procedure RType.makeTypeRef(const tn: string);
-begin
-  if spec = '' then
-  //assume typeref
-    self.basetype := Globals.defType(tn, '', nameID)
-  else if Globals.isType(tn) >= 0 then
-  //modification of previously defined type!
-    self.basetype := Globals.defType(tn, '', nameID);
-  spec := spec + quoteType(tn);
-  self.specToken := t_sym;
-end;
-{$ELSE}
-  //unused
-{$ENDIF}
 
 procedure RType.makePointer;
 begin
@@ -2272,13 +2137,8 @@ end;
 procedure RType.makeScope;
 begin
   if mbrScope = nil then begin
-  {$IFDEF old}
-    mbrScope := TScopeC.Create('params'); //or enum elements?
-  {$ELSE}
-    //mbrScope := TLocalScope.Create('params'); //or enum elements?
     mbrScope := TParamScope.Create('params'); //or enum elements?
     //name: proc name?
-  {$ENDIF}
     self.fTempScope := True;
   end;
 end;
@@ -2835,13 +2695,8 @@ function TSymProc.BodyString: string;
 begin
 //bug - proc instead of proc-var!
   if FBody <> nil then
-    Result := FBody.toString
-  else
-  {$IFDEF old}
-    Result := ';';  //really?
-  {$ELSE}
-    //";" should be reserved for wrapped lines!
-  {$ENDIF}
+    Result := FBody.toString;
+  //else  //";" should be reserved for wrapped lines!
 end;
 
 function TSymProc.toString: string;
@@ -2875,9 +2730,6 @@ constructor TSymBlock.CreateBlock(AOwner: TXStrings; AScope: TScope);
 begin
 //based on TStringList!
   inherited Create;
-{$IFDEF old}
-  Scope := TLocalScope.CreateScope(AOwner, AScope);  //owner???
-{$ELSE}
   Scopes := TScopeList.Create;
 //add params and parent scope of params
   if AScope <> nil then
@@ -2887,18 +2739,13 @@ begin
   Scopes.Add(AScope); //assume: Params
   //CurScope := TLocalScope.CreateScope(AOwner, AScope);  //owner???
   CurScope := AScope; //parent of scopes to come
-{$ENDIF}
   ScopeNum := 1;  //1=parameters
 end;
 
 destructor TSymBlock.Destroy;
 begin
-{$IFDEF old}
-  FreeAndNil(Scope);
-{$ELSE}
   CurScope := nil;
   FreeAndNil(Scopes);
-{$ENDIF}
   inherited;
 end;
 
@@ -2937,17 +2784,11 @@ begin
   add(s + '{(');
   s := '';
   inc(ScopeLvl);
-{$IFDEF old}
-  inc(ScopeNum);
-  Scope.Clear;  //prepare for adding locals
-  Scope.ScopeNum := ScopeNum;
-{$ELSE}
   //CurScope := Scopes.getScope(ScopeNum);
   newScope := TLocalScope.CreateScope(nil, CurScope);
   ScopeNum := Scopes.Add(newScope);
   newScope.ScopeNum := ScopeNum;
   CurScope := newScope;
-{$ENDIF}
   Result := self; //somewhat obsolete...
 end;
 
@@ -2976,10 +2817,6 @@ begin
     l := l + sym.toString + ');';
     add(l);
   end;
-{$IFDEF old}
-  Scope.Clear; //iff single scope!
-{$ELSE}
-{$ENDIF}
 end;
 
 procedure TSymBlock.addStmt(var s: string);
@@ -2995,12 +2832,7 @@ begin
   if s <> '' then
     add(s); //???
   s := '};'; //block end flag, + stmt end to come
-{$IFDEF old}
-  assert(Scope.count = 0, 'scope not empty');
-  //Scope.Clear;  //should: pop added vars (should do nothing)
-{$ELSE}
   CurScope := CurScope.ParentScope;
-{$ENDIF}
   dec(ScopeLvl);
   Result := self;  //or: return Scope.parentScope?
 end;
@@ -3018,14 +2850,8 @@ function TLocalScope.defSym(AKind: CreatableSyms; const AName,
   ADef: string; const AVal: TSymVal): TSymbolC;
 begin
 //modify into local symbols
-{$IFDEF old}
-  Result := inherited defSym(stLocal, AName, ADef, AVal);
-  Result.kind := AKind; //stLocal only for symbol class!!!
-  Result.Key := ScopeNum;
-{$ELSE}
   Result := inherited defSym(AKind, AName, ADef, AVal);
   Result.ScopeNum := ScopeNum;
-{$ENDIF}
 end;
 
 { TParamScope }
@@ -3051,24 +2877,9 @@ end;
 function TScopeList.getScope(index: integer): TScope;
 begin
   Pointer(Result) := self.Get(index);
-{$IFDEF old}
-  if (Result = nil) and (i > 1) then begin
-    Result := TLocalScope.CreateScope(nil, nil);  //???
-    Result.ScopeNum := i;
-    if i < Count then
-      self.Put(i, Result)
-    else if i = Count then
-      self.Add(Result)
-    else begin
-      Log('bad scope number', lkBug);
-      Add(Result);  //for destroy!
-    end;
-  end;
-{$ELSE}
 //no auto-create!
   if Result = nil then
     Log('bad scope number', lkBug);
-{$ENDIF}
 end;
 
 initialization
