@@ -595,17 +595,17 @@ var
   sym:  TSymbolC;
 begin
   r := Symbols.getSymbol(id);
-  if r.loc.src <> nil then
+  if r.loc.valid then
     SymLocs[2] := r.loc
   else
-    SymLocs[2].src := nil;
+    SymLocs[2].invalidate;
   sym := nil; //if not otherwise specified
   mac := r.GetMacro;
   if (mac <> nil) {and (mac.loc.src <> nil)} then begin
     SymLocs[1] := mac.loc;
     sym := Globals.getSym(mac.altID);
   end else begin
-    SymLocs[1].src := nil;
+    SymLocs[1].invalidate;
     TObject(mac) := r.FObject;
     if mac is TSymbolC then
       sym := TSymbolC(mac);
@@ -1448,7 +1448,8 @@ The Globals table is dumped in order,
     psym: PSymPrep;
     nextMac: integer; //to be shown
     s: string;
-    f: TFile;
+    //f: string; //filename, was: TFile;
+    FileID: integer;
 
     procedure WriteBug(const id1, id2: string);
     const
@@ -1464,10 +1465,11 @@ The Globals table is dumped in order,
     procedure WriteASym(sym: TSymbol; c: char; const l: string);
     begin
     //source file
-      if sym.loc.src <> nil then begin
-        if f <> sym.loc.src then begin
-          f := sym.loc.src;
-          WriteLn('[' + f.name + ']', False);
+      if sym.loc.valid then begin
+        if sym.loc.id <> FileID then begin
+          FileID := sym.loc.id; // f := sym.loc.src;
+          //WriteLn('[' + f + ']', False);
+          WriteLn('[' + sym.loc.name + ']', False);
         end;
       //id and line number
         s := c + IntToStr(sym.loc.line) + #9;
@@ -1546,7 +1548,7 @@ The Globals table is dumped in order,
     end;
 
   begin //SaveAllSymbols
-    f := nil;
+    FileID := -1; // NoFile;
     nextMac := 0;
     for i := 0 to Count - 1 do begin
       try
@@ -1844,7 +1846,7 @@ begin
   if tag <> '' then begin
     spec := spec + ':' + tag;
     basetype := Globals.defType(spec, '', nameID); //typename without quotes
-    if loc.src = nil then begin
+    if not loc.valid then begin
     //default location?
       loc := ScanSym.loc;
       //pSrc.??? ScanningFile???
@@ -2012,7 +2014,7 @@ begin
   else
     symkind := stVar;
   declSym := Scope.defSym(symkind, name, getDef, Value);
-  if self.loc.src <> nil then
+  if self.loc.valid then
     declSym.loc := self.loc;
 //no type symbols here, only proc, const, var (global, local, param)
   if (scope = Globals) and (storage <> Kextern) then
@@ -2504,7 +2506,7 @@ procedure TModule.SaveToStream(Stream: TStream);
 const
   fPrepSyms = False;  //no save preprocessor symbols
 var
-  symf: TFile;
+  symf: integer; // string; //filename TFile;
 
   procedure WriteLn(const s: string; fSplit: boolean);
   var
@@ -2561,7 +2563,7 @@ Most important is the order of HLL symbol definitions!
     procedure WriteASym(sym: TSymbol; c: char; const l: string);
     begin
       //s := s + IntToHex(sym.GlobalID,4) + #9 + c;
-      if sym.loc.src = symf then begin
+      if sym.loc.id = symf then begin
         s := c + IntToStr(sym.loc.line) + #9;
       end else
         s := c + #9;
@@ -2648,9 +2650,9 @@ begin //TModule.SaveToStream
     Globals.SaveToStream(Stream)
   else begin
   //version identifier
-    symf := self.Source;
+    symf := self.Source.id;
     WriteLn(StreamVersion, False);
-    WriteLn('[' + symf.name + ']', False);
+    WriteLn('[' + Files.Strings[symf] + ']', False);
     SaveAllSymbols;
   end;
 end;

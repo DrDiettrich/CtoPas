@@ -1595,18 +1595,20 @@ var
         ScanText := '';
         SetString(ScanText, pc1, pc - pc1);
         ScanToken.symID := mapSym(ScanText);
-        r := Symbols.getSymbol(ScanToken.symID);
-        if r.loc.src = nil then begin
-        //only at first occurence!
-          r.loc.src := self.src;
-          r.loc.line := self.CurLine;
-          ScanSym := r^;
-        end else begin
-        //actual occurence
-          ScanSym := r^;
-          ScanSym.loc.src := self.src;
-          ScanSym.loc.line := self.CurLine;
-        end;
+        if self.src <> nil then begin //File scanner
+          r := Symbols.getSymbol(ScanToken.symID);
+          if not r.loc.valid then begin
+          //only at first occurence!
+            r.loc.id := self.src.id; //src can be nil?
+            r.loc.line := self.CurLine;
+            ScanSym := r^;
+          end else begin
+          //actual occurence
+            ScanSym := r^;
+            ScanSym.loc.id := self.src.id;
+            ScanSym.loc.line := self.CurLine;
+          end;
+        end; // else //StringScanner!
         ScanText := ScanSym.FString;  //unique string
       except
         assert(pc > pc1);
@@ -1927,7 +1929,8 @@ begin
     ScanningText := CurFile.LineBuf;
     if fFileClosed and assigned(OnLineChange) then
       OnLineChange(lcResumeFile, CurFile);
-  end;
+  end else //remember last source file?
+    CurFile := nil; //if last file is being popped?
 end;
 
 procedure TTokenStack.push(src: TTokenStream);

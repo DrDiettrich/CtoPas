@@ -123,7 +123,8 @@ type
     procedure TestParse(const StartFile: string);
     function  MainFile: string;
     procedure PrepLockCallback(change: eLineChange; f: TFileC);
-    procedure SetSrc(SrcFile: TFile);
+    procedure SetSrc(SrcFile: TFile); overload;
+    procedure SetSrc(SrcID: integer); overload;
     procedure ShowLoc(const r: RFileLoc);
     procedure JmpPrev;
     procedure JmpNext;
@@ -171,7 +172,7 @@ type
 
 constructor TFilePos.Create(AFile: TFile; ALine: integer);
 begin
-  loc.src := AFile;
+  loc.id := AFile.id;
   loc.line := ALine;
 end;
 
@@ -192,10 +193,13 @@ begin
   else  //log message, remember and show position
     if TokenStack.CurFile <> nil then begin
     //CurFile.src seems to be invalid, sometimes???
-      if ScanToken.line > 0 then
-        pos := TFilePos.Create(TokenStack.CurFile.src, ScanToken.line)
-      else
-        pos := nil;
+      if TokenStack.CurFile.src <> nil then begin
+        if ScanToken.line > 0 then
+          pos := TFilePos.Create(TokenStack.CurFile.src, ScanToken.line)
+        else
+          pos := nil;
+      end else
+        pos := nil; //debug - msg not while parsing?
       self.lbMsg.Items.AddObject(msg, pos);
     //scroll into view
       i := lbMsg.Items.Count - 5;
@@ -237,7 +241,7 @@ begin
 //open (test) file
   tc := 0;
   ScanFile(StartFile);
-  FileID := -1; //force file change detect
+  FileID := -1; // NoFile; //force file change detect
 //scan
   try
     while nextTokenC <> t_eof do begin
@@ -276,7 +280,14 @@ end;
 procedure TScanLog.SetSrc(SrcFile: TFile);
 begin
   CurFile := SrcFile;
+  FileId := SrcFile.id;
   Painter.SetSrc(SrcFile, True);
+end;
+
+procedure TScanLog.SetSrc(SrcID: integer);
+begin
+  CurFile := Files.GetFile(SrcID);
+  SetSrc(CurFile);
 end;
 
 procedure TScanLog.mnuTestScanClick(Sender: TObject);
@@ -327,14 +338,14 @@ var
   i: integer;
 begin
 try //don't know when/why r.src can be invalid :-(
-  if (r.line <= 0) or (r.src = nil) or (cardinal(r.src) < $400000) then
+//try: replace TFile by string (filename)
+  if (r.line <= 0) or (not r.valid) then // or (cardinal(r.src) < $400000) then
     exit; //???
 //show file
-  if r.src.id <> FileID then begin
+  if r.id <> FileID then begin
   //load file
-    SetSrc(r.src);  //self.lbSrc.Items := pos.f;
-    FileID := r.src.id;
-    StatusBar.Panels[1].Text := r.src.dir + r.src.name;
+    SetSrc(r.id);  //self.lbSrc.Items := pos.f;
+    StatusBar.Panels[1].Text := CurFile.dir + CurFile.name;
   end;
   i := r.line - 1; //start index at 0, line numbers at 1 (???)
 //scroll into view - raw guess
@@ -603,7 +614,7 @@ var
 begin
   locs := r;
   for i := low(locs) to high(locs) do begin
-    if locs[i].src <> nil then begin
+    if locs[i].valid then begin
       self.ShowLoc(locs[i]);
       exit;
     end;
@@ -670,7 +681,7 @@ begin
     sym := Painter.sym.FMacro //C or preprocessor symbol
   else
     sym := nil;
-  if (sym = nil) or (sym.loc.src = nil) then
+  if (sym = nil) or not sym.loc.valid then
     exit;
 //truncate the stack
   Links.Count := iLink;

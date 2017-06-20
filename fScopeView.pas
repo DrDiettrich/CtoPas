@@ -90,25 +90,25 @@ begin
     s := s + '[' + IntToStr(sym.UniqueID) + '/'  //global STB
       + IntToStr(sym.GlobalID) + ']' + EOLstr;  //C symbols
   //locs
-    if sym.loc.src <> nil then begin
+    if sym.loc.valid then begin
       loc := sym.loc;
       locs[0] := loc;
-      s := s + 'def ' + loc.src.name + ':' + IntToStr(loc.line) + EOLstr;
+      s := s + 'def ' + loc.name + ':' + IntToStr(loc.line) + EOLstr;
       if sym.UniqueID > 0 then begin
         r := Symbols.getSymbol(sym.UniqueID);
         mac := r.GetMacro;
-        if (mac <> nil) and (mac <> sym) and (mac.loc.src <> nil) then begin
+        if (mac <> nil) and (mac <> sym) and (mac.loc.valid) then begin
           loc := mac.loc;
           locs[1] := loc;
-          s := s + 'mac ' + loc.src.name + ':' + IntToStr(loc.line) + EOLstr;
+          s := s + 'mac ' + loc.name + ':' + IntToStr(loc.line) + EOLstr;
         end else
-          locs[1].src := nil;
-        if (r.loc.src <> nil)
-        and ((r.loc.src <> loc.src) or (r.loc.line <> loc.line)) then begin
+          locs[1].invalidate;
+        if (r.loc.valid)
+        and ((r.loc.id <> loc.id) or (r.loc.line <> loc.line)) then begin
           locs[2] := r.loc;
-          s := s + 'sym ' + r.loc.src.name + ':' + IntToStr(r.loc.line) + EOLstr;
+          s := s + 'sym ' + r.loc.name + ':' + IntToStr(r.loc.line) + EOLstr;
         end else
-          locs[2].src := nil;
+          locs[2].invalidate;
       end;
       showSym(locs);  //even if not in Symbols!
     end;

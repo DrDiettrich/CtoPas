@@ -117,8 +117,8 @@ begin
     s := s + '[' + IntToStr(sym.UniqueID) + '/'  //global STB
       + IntToStr(sym.GlobalID) + ']'; // + EOLstr;  //C symbols
     id := sym.UniqueID;
-    if (id >= 0) and (sym.loc.src <> nil) then
-      s := s + ' in ' + {sym.loc.src.dir +} sym.loc.src.name
+    if (id >= 0) and (sym.loc.valid) then
+      s := s + ' in ' + {sym.loc.src.dir +} sym.loc.name
         + ':' + IntToStr(sym.loc.line) + EOLstr;
     s := s + sym.toString; //definition?
     edDef.Text := s;

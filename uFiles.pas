@@ -68,12 +68,17 @@ type
 {$ENDIF}
 
 (* problem: TFile reference can become invalid!
-  Can a filename be stored in a record, not handled when copying?
+  Can a filename be stored in a record, handled when copying?
+  FileID = index in file table?
 *)
-  RFileLoc = record
+  RFileLoc = object
     //src:  TFile; //can be closed!
-    name: string;
+    //src: string; //omit?
+    id: integer;
     line: integer;
+    function name: string;
+    procedure invalidate;
+    function valid: boolean;
   end;
   TFileLocs = array[0..2] of RFileLoc;  //mac, decl, def
 
@@ -466,6 +471,32 @@ end;
 function TSymbols.getSym(index: integer): TSymbol;
 begin
   TObject(Result) := Members[index];
+end;
+
+{ RFileLoc }
+
+const //private, app should use invalidate()
+  //NoFile = ''; //or nil for TFile
+  NoFile = -1; //ID
+
+procedure RFileLoc.invalidate;
+begin
+  id := NoFile;
+  line := 0; //src lines start at 1!
+end;
+
+function RFileLoc.name: string;
+begin
+  if valid then
+    Result := Files.Strings[id]
+  else
+    Result := '';
+end;
+
+function RFileLoc.valid: boolean;
+begin
+  //Result := id <> NoFile; File[0] exists! (prj-file)!
+  Result := (id >= 0) and (line > 0);
 end;
 
 initialization

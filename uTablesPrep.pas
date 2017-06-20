@@ -304,6 +304,8 @@ end;
 var
   KeysInited: boolean = False;
 
+(* Problem: no current file available for positions
+*)
 procedure InitKeys;
 var
   i: eLangKeys;
@@ -436,7 +438,7 @@ constructor TSymMacro.Create(const AName: string; AKey: integer);
 begin
   inherited;
 //file loc
-  if ScanSym.loc.src <> nil then
+  if ScanSym.loc.valid then
     self.loc := ScanSym.loc;  //first occurence
 end;
 

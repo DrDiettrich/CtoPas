@@ -1332,7 +1332,7 @@ MS extension: qualifiers!!!
   identifier
   "(" declarator ")"
   *)
-  r.loc.src := nil; //invalidate file position
+  r.name := ''; // r.loc.src := nil; //invalidate file position
   if i_ttyp = opLPar then begin
   (* A nested declarator specifies the topmost type.
     A name can occur only inside this declarator!

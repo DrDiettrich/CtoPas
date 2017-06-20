@@ -392,6 +392,8 @@ const //alias for special token kinds
   //saRule = taRemBeg;  //syntax tree node - what token kind?
 
 type
+(* here FileId f cannot be a string, in a variant section!
+*)
   RPreToken = packed record
     pc:   PChar;  //token start in source file (file.Strings[linenum])
     len:  word;   //and token length, for display and other purposes
