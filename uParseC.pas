@@ -144,8 +144,8 @@ end;
 (* cond_expression - transform (constant) expressions into string.
   Other: expression, assignment_expression are not constant expressions!
 *)
-function  cond_expression: string;
 
+function  cond_expression: string;
 (*
 type_name :
 specifier_qualifier_list [abstract_declarator]
@@ -234,7 +234,8 @@ string_literal
           //if ScanSym.mackind <> skConst...
             //include(ParserFlags, pfNotConst);
         {$ELSE}
-          Result := ScopedName; //search symbol in scopes
+          Result := ScopedName; //search symbol in scopes -> CurSym/nil
+          //case CurSym.kind...
         {$ENDIF}
           nextToken;
         end;
@@ -260,6 +261,7 @@ string_literal
         end;
       opLPar: // ( here: call!
         begin
+        //todo: allow for sizeof() as const fn
           ParserFlags := ParserFlags + [pfNotConst, pfCode];  //unless intrinsic!?
           Result := addArg(startOp, Result);  // "(("proc
           if i_ttyp = opRPar then  //"("
@@ -620,17 +622,18 @@ var
   CurScope: TScope;
   CurSym: TSymbolC;
 
+(* sets CurSym, maybe nil if error
+*)
 function  ScopedName: string;
 begin
   if CurScope = nil then
-    Result := ScanText  //default
-  else begin
+    CurSym := nil
+  else
     CurSym := CurScope.findSym(ScanText);
-    if CurSym = nil then
-      Result := ScanText
-    else begin
-      Result := CurSym.name;
-    end;
+  if CurSym = nil then
+    Result := ScanText
+  else begin
+    Result := CurSym.name;
   end;
 end;
 
@@ -1619,43 +1622,37 @@ var
 
   procedure init;
   begin
-    FreeAndNil(blk);
+    Result := mcEmpty; //if no tokens
+    FreeAndNil(blk); //can be called multiple times
     tokens := mac.GetTokens;
     if tokens = nil then
-      Result := mcEmpty
-    else begin
-      //tokens.firstC;
-      tokens.rewind;
-      TokenStack.push(tokens);
-      if nextToken = t_eof then
-        Result := mcEmpty;
-    end;
-    if Result <> mcEmpty then begin
+      exit;
+    //tokens.firstC;
+    tokens.rewind;
+    TokenStack.push(tokens);
+    if nextToken <> t_eof then begin
       blk := TSymBlock.CreateBlock(nil, Globals);
       ParserFlags := [];
       s := '';
       //mac.Expanding := True;
       (mac as TMacro).expanding := True;
+      Result := mcFailed;
     end;
   end;
 
 begin //ParseMacro
 //init parser mode
   fParseMacro := True;
-  Result := mcFailed;
   blk := nil;
   init;
   if Result <> mcEmpty then begin
   //not empty, try expression
-    //if i_ttyp <> opLBra then begin
-      //assume "{" means procedure?
     s := expression;
     //Result := (s <> '') and (ParserFlags = []);
     if ParserFlags = [] then
       Result := mcExpr
     else if ParserFlags = [pfNotConst] then
       Result := mcNotConst
-  //end;
     else if Result < mcExpr then begin
     //not expression, try statement
       init;
@@ -1669,6 +1666,8 @@ begin //ParseMacro
     (mac as TMacro).expanding := False;
     blk.Free;
   end;
+  while TokenStack.pop do
+    ; //remove dangling files
 //reset parser mode
   fParseMacro := False;
 end;
