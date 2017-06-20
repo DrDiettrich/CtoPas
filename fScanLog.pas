@@ -327,7 +327,7 @@ var
   i: integer;
 begin
 try //don't know when/why r.src can be invalid :-(
-  if (r.line <= 0) or (r.src = nil) then
+  if (r.line <= 0) or (r.src = nil) or (cardinal(r.src) < $400000) then
     exit; //???
 //show file
   if r.src.id <> FileID then begin
@@ -364,7 +364,7 @@ begin
     exit;
 //show filepos?
   o := lbMsg.Items.Objects[i];
-  if o is TFilePos then begin
+  if (o <> nil) and (o is TFilePos) then begin
     ShowLoc(pos.loc);
   end;
 end;

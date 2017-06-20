@@ -67,8 +67,12 @@ type
 {$ELSE}
 {$ENDIF}
 
+(* problem: TFile reference can become invalid!
+  Can a filename be stored in a record, not handled when copying?
+*)
   RFileLoc = record
-    src:  TFile;
+    //src:  TFile; //can be closed!
+    name: string;
     line: integer;
   end;
   TFileLocs = array[0..2] of RFileLoc;  //mac, decl, def
