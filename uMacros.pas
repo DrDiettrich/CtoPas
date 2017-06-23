@@ -85,7 +85,9 @@ type
   end;
 
   eBuiltin = (
-    bmFile, bmLine
+    bmFile, bmLine,
+    bmPragma,  //_Pragma ( "str" )
+    bmExtern  //derive external lib name from symbol name
   );
 
   TMacroBuiltin = class(TMacro)
@@ -972,6 +974,53 @@ end;
 { TMacroBuiltin }
 
 function TMacroBuiltin.Expand(src: TTokenStream): TMacroTokens;
+
+  procedure _Pragma;
+  var
+    s: string;
+  begin
+  (* Problem: handlePragma should be called from here,
+    using a temporary StringScanner.
+    Line end(s) must be handled properly, i.e. #pragma will skip to t_bol
+    after pragma execution - not so for _Pragma(str)!
+
+    Current implementation skips until ")", then flags current token handled.
+  *)
+    Result := nil; //should mean: error!
+    //ScanToken.kind := t_err; - will be overridden
+    if (src.nextRaw <> opLPar) then
+      exit;
+    if (src.nextRaw <> t_str) then
+      exit;
+    s := ScanText; //unquoted?
+    if src.nextRaw <> opRPar then
+      exit;
+    Log('_Pragma not executed', lkTodo);
+    ScanToken.kind := t_empty; //flag handled
+    exit;
+  //todo: make handlePragma accessible from here!
+  {
+    if Pos('\', s) > 0 then begin
+      s := StringReplace(s, '\\', '\', [rfReplaceAll]);
+      s := StringReplace(s, '\"', '"', [rfReplaceAll]);
+    end;
+  //now invoke the #pragma directive!
+    StringScanner.scanString(s); //first token becomes current token = pragma name
+    handlePragma(StringScanner);
+    ScanToken.kind := t_empty; //flag handled
+  }
+  end;
+
+  (* Derive DLL name from symbol name, for external procedures.
+    Store in uToPas.LibRef, as quoted string?
+    String table where?
+  *)
+  procedure defLib();
+  begin
+    //...
+    //t.stringID := StringTable.Add(s); //mapString(s);
+  end;
+
 begin
   case which of
   bmFile:
@@ -986,13 +1035,20 @@ begin
       ScanToken.kind := t_int;
       ScanToken.ival := TokenStack.CurFile.CurLine;
     end;
+  bmPragma: _Pragma();
+  bmExtern:
+    begin
+      defLib();
+      Result := inherited Expand(src); //expand #defined body
+      exit; //skip common "done" section
+    end;
   else  //default
     assert(False, 'unhandled builtin macro');
     ScanToken.kind := t_empty;
   end;
 //done - return nothing, meaning re-interpret ScanToken
   ScanToken.pc := nil;  //meaning synthetic text
-  Result := nil;
+  Result := nil; //except _Pragma?
 end;
 
 class procedure TMacroBuiltin.Init;

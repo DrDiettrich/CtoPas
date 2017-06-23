@@ -1210,7 +1210,7 @@ begin //handleDirective - called at '#'
           pdError:  handleError;
           pdLine:   handleLine;
           pdWarning:  handleWarning;
-          pdPragma: handlePragma;
+          pdPragma: handlePragma; //also used for _Pragma!
           else  //default
               Log('unhandled #' + dirName, lkTodo);
           end;
