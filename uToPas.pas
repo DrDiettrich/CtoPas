@@ -435,6 +435,7 @@ type
     proc: TSymProc;
     sym:  TSymbolC; //from Scanner, on t_sym
     pc: PChar;  //in typedef
+    inFile: integer; //fileID of declaration
     function  nextToken: eToken;
     function  expect(t: eToken; const msg: string): boolean;
     function  skip(t: eToken): boolean;
@@ -509,6 +510,12 @@ begin
   if not Result then
     exit;
   self.sym := ASym;
+//show origin
+  if sym.loc.valid and (sym.loc.id <> inFile) then begin
+    Outdent(' '); //empty line before
+    Outdent('//@ --- ' + sym.loc.name + ' ---');
+    inFile := sym.loc.id;
+  end;
   case sym.kind of
   stConst:      WriteConstSym;
   stEnumMember: if fDebugEnums then WriteConstSym;
