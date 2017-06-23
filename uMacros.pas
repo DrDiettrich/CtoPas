@@ -141,6 +141,9 @@ var
 
 begin
 //## invalid as first or last (before EOF) token
+(* ToDo: Needs update according to old ToPas!
+  add and mark invalid occurence as nop2Sharp.
+*)
   if FTokens[0].kind = op2Sharp then begin
     Log('Tokens[0]=##', lkSynErr);
   end;
@@ -203,6 +206,7 @@ begin
   iNext := 0;
 //check for non-whites
   Result := iNext;
+//? preserve comments for crosscompiler?
   while (Result >= 0) and (FTokens[Result].kind <= t_rem) do
     dec(Result);
   inc(Result);  //true count
@@ -275,6 +279,8 @@ end;
 (* Define - record #define
 Problem:
 GNU redefines "const", in a way that it becomes a symbol?
+
+Allow to create special (built-in) macro as TMacroBuiltIn?
 *)
 //class function TMacro.Define(pFile: TFileC; fFunc: boolean): TMacro;
 class function TMacro.Define(pFile: TFileC): TMacro;

@@ -33,21 +33,29 @@ interface
 
 {$I config.pas}
 
-{ $DEFINE MacroObjects}  //undef requires Globals.DefFile
-
 uses
   Classes,
   uTranslator,
   uTokenC, uTablesC;
 
+
+(* ??? Looks like MacroObjects shall use an external (editable) file
+  with macro definitions and re-definitions (valid Pascal)
+  as an attempt to classify macros into consts, procs and macros (expanding).
+
+  Also requires ShowMacs=True, for listing in "implementation" section.
+*)
+{ $DEFINE MacroObjects}  //if defined requires Globals.DefFile
+
 const //todo: show macros from new deffile format!!!
   ShowMacs = False; //format problem!!!
 
-//procedure ToPas(const fn: string);
+
 procedure ToPas(const fn: string; fSort: boolean = false);
-//procedure CheckNames(filename: string);
-//function  ExpressionString(leftOp: eToken): string;
+
+//string conversion
 function  AnsiToPascal(const s: string): string;
+//including WideChar/String modifier
 function  AnsiToP(const s: string; delim: char; fLong: boolean): string;
   //callback for TokenString
 
@@ -59,7 +67,7 @@ function  CheckMeta(mf: TModule): boolean;
 
 type
   ePrjType = (
-    ptUnit, //default, create an standard unit *.pas
+    ptUnit, //default, create a standard unit *.pas
     ptPrg,  //create a main (program) unit *.dpr
     ptLib,  //create a library, external... -> *.pas
     //ptObjLib, //library from object file, $L -> *.pas
@@ -119,15 +127,20 @@ uses
 (* Handle external references
 1) when building a library module?
   todo...
-2) imported by $L
-  todo...
+2) imported by $L -> is part of a Delphi unit, not C
 3) reference to external library
+  Windows: macros ...API start proc declaration, refer to the library
+    WINBASEAPI -> kernel32.dll
+    WINUSERAPI -> user32.dll
+    WINADVAPI  -> advapi32.dll
+    WINGDIAPI  -> gdi32.dll(?)
+  Add LibRef to proc def, replace TToPascal.LibName?
   Assume 1 library, or symbols sorted by library.
   Create a constant for the library name,
     for constant reference expressions.
 *)
-const //external __lib;
-  LibRef = '__lib';
+var //external __lib;
+  LibRef: string = '__lib'; //dummy lib name
 
 type
   ePasOp = (
@@ -398,7 +411,7 @@ type
   protected //in file order
     //fImpl: boolean; //write implementation?
     curkind: eSymType;  //section: const, var, type, proc
-    fLibName: boolean;
+    fLibName: boolean;  //translate library, NOT external LibRef
     procedure WriteHeader;  //unit...
     procedure WriteIntf;
     procedure WriteImpl;
@@ -999,18 +1012,40 @@ begin
   Write(aSigned[fSigned] + len);
 end;
 
+(* Show basic type
+Problems:
+  BYTE="unsigned char(!)" -> UChar=Char - must be: Byte/UInt1
+    how to distinguish real (Pascal) char from (C) char=byte?
+    #define _CHAR_UNSIGNED  1 --> default char IS unsigned (+)
+    PSZ=*c means String Zeroterminated -> ^Char
+    _lower=[]+c means Array of Char?
+
+Workaround: assume c=Char, unless prefixed by un/signed
+*)
 procedure TToPas.WriteUnSigned(fSigned: boolean);
 var
   s: string;
 const
   acSigned: array[boolean] of char = 'US';
   asSigned: array[boolean] of string = ('{unsigned}', '{signed}');
-  asShort:  array[boolean] of string = ('SmallInt', 'Word');
+  asChar:   array[boolean] of string = ('Byte', 'ShortInt');
+  asShort:  array[boolean] of string = ('Word', 'SmallInt'); //fixed: was swapped
   asInt:    array[boolean] of string = ('Cardinal', 'Integer');
   asLong:   array[boolean] of string = ('LongWord', 'LongInt');
 begin
-  if pc^ in ['+', '-'] then
-    inc(pc);
+//handle type c
+  if pc^ in ['+', '-'] then begin
+  //override parameter
+    fSigned := pc^ = '-'; //unsigned=+, signed=-
+    inc(pc); //must match fSigned! +=unsigned, -=signed
+    if pc^ = 'c' then begin
+    //assume non-char if explicitely signed
+      Write(asChar[fSigned]);
+      inc(pc);
+      exit;
+    end;
+  end;
+
   case pc^ of
   '"':  //try decode base type
     begin //single level search, for now
@@ -1025,7 +1060,7 @@ begin
     end;
   '1','2','4','8': WriteSized(fSigned, pc^);
   'L':  Write(acSigned[fSigned] + 'Int8');
-  'c':  Write(acSigned[fSigned] + 'Char');
+  'c':  Write('Char'); //if no signedness specified
 //use Delphi standard types
   'i':  Write(asInt[fSigned]);  // Write(acSigned[fSigned] + 'Int');
   'l':  Write(asLong[fSigned]); // Write(acSigned[fSigned] + 'Long');
@@ -1217,7 +1252,7 @@ begin
     'S':  WriteStruct(fIn);
     'U':  WriteUnion(fIn);
     'V':  WriteInc('{volatile}'); // inc(pc);  //skip "volatile"
-    'c':  WriteInc('Char');
+    'c':  WriteInc('Char'); //usually means: Int8, not Char!!!
     'd':  WriteInc('Double');
     'f':  WriteInc('Float');
     'i':  WriteUnSigned(True);  //WriteInc('Integer');
@@ -2203,7 +2238,7 @@ end;
             args := '(const ' + copy(args, 2, Length(args));
           WriteLn(f, args, ';');
           WriteLn(f, 'begin {');
-          WriteLn(f, s);
+          WriteLn(f, s); //not body!!!???
           WriteLn(f, '} end;');
           WriteLn(f);
         end;  //else empty body

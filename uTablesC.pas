@@ -371,7 +371,6 @@ other - local
     function  leaveBlock(var s: string): TSymBlock;
   end;
 
-
   TSymProc = class(TSymProto)
   protected
     FBody: TSymBlock;  // TScopeC;  //Block!!! both scope and decl-str?
@@ -2006,6 +2005,8 @@ begin
   end;  //case
   if (scope = nil) or (declSym <> nil) then
     exit; //assume nothing to create, or done
+
+//now create a polymorphic symbol (very hidden in code)
 //detect procedures how???
   if (post <> '') and (post[1] = '(') then
     symkind := stProc
@@ -2013,7 +2014,7 @@ begin
     symkind := stConst
   else
     symkind := stVar;
-  declSym := Scope.defSym(symkind, name, getDef, Value);
+  declSym := Scope.defSym(symkind, name, getDef, Value); //polymorphic create
   if self.loc.valid then
     declSym.loc := self.loc;
 //no type symbols here, only proc, const, var (global, local, param)
@@ -2080,18 +2081,11 @@ begin
     self.type_specifier(Kint, True);
 //handle local scope?
   if (name <> '') and (declsym = nil) then begin
-  {$IFDEF new}
-    proc := Globals.defProc(name, self.getDef);
-    declSym := proc;
-    if i_ttyp = opBeg then
-      Statics.AddObject(name, proc);
-  {$ELSE}
   //declaration or definition{...}?
     if (self.storage <> Ktypedef) and (i_ttyp <> opBeg) then begin
       storage := Kextern;
       FreeAndNil(mbrScope); //not stored for external procs!
     end;
-  {$ENDIF}
     self.endDecl; //should create proc sym
     if (declSym <> nil) and (mbrScope <> nil)
     and (declSym is TSymProc) then begin  //exclude typedefs?

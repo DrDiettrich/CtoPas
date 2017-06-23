@@ -116,6 +116,10 @@ Overwrite in derived (writing) classes:
 Classify symbols:
 - macro/global/local
 - for macros: eventual C meaning (const, proc...)
+? add skPKey: Pascal keyword, sym must be renamed and flagged
+? add skPType: Pascal typename, no re-definition nor other manipulations
+? add skLib: for external 'libname', WINBASEAPI -> lib 'kernel32.dll'
+? add skBuiltIn: for built-in macros?
 *)
   eSymbolKind = (
   //symbols (without macros)
@@ -436,7 +440,7 @@ end;
 
 constructor TSymMacro.Create(const AName: string; AKey: integer);
 begin
-  inherited;
+  inherited Create(AName, AKey);
 //file loc
   if ScanSym.loc.valid then
     self.loc := ScanSym.loc;  //first occurence
