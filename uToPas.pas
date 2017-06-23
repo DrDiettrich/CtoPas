@@ -409,9 +409,11 @@ type
     procedure WriteUnion(fIn: eSU);
     procedure WriteUnSigned(fSigned: boolean);
   protected //in file order
+    //ExtName,  //exernal name <extname> - not yet, not explicit?
+    ExtLib: string; //for external <libname>
     //fImpl: boolean; //write implementation?
     curkind: eSymType;  //section: const, var, type, proc
-    fLibName: boolean;  //translate library, NOT external LibRef
+    //fLibName: boolean;  //translate library, NOT external LibRef
     procedure WriteHeader;  //unit...
     procedure WriteIntf;
     procedure WriteImpl;
@@ -1471,10 +1473,14 @@ begin
   //show definition = body
     WriteProcBody;  //(proc)
   end else begin
-  //external
-    Write('external');
-    if self.fLibName then
-      Write(' ' + LibRef);
+  //external reference, optional library and external name
+    Write('external ');
+    Write(proc.LibName); //if library known, not linked by $L
+  {
+    if proc.ExtName <> '' then
+      Write('name ');
+      Write(proc.ExtName);
+  }
     WriteLn(';');
   end;
 end;
@@ -2205,15 +2211,33 @@ end;
 procedure TToPas.WriteIntf;
 var
   i: integer;
+  c: eKnownLibs;
 begin
 //"interface" already shown.
 //"uses"???
 //imports?
+{$IFDEF old}
   if (self.LibName <> '') and not fLibName then begin
     ConstSection;
     WriteLn(LibRef + ' = ''' + LibName + ''';');
     fLibName := True; //use libref
   end;
+{$ELSE}
+(* Symbols are predefined macros, are listed anyhow
+  Create constants in TMacroLibs!
+  But a list would be nice, like in Windows.pas:
+const
+  advapi32  = 'advapi32.dll';
+  kernel32  = 'kernel32.dll';
+  ...
+*)
+  ConstSection;
+  for c := low(c) to high(c) do begin
+    //only if macro used?
+    WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
+  end;
+{$ENDIF}
+
   for i := 0 to Scope.Count - 1 do begin
     sym := Scope.getSym(i);
   //hide static symbols

@@ -129,6 +129,14 @@ var
   fMetaNames: boolean;
     //True during meta-output of procedures (parse body)
 
+(* remember library name from WIN...API macros
+  for external <lib>
+
+  Applies to currently defined procedure only, clear after use!
+*)
+var
+  FromLib: string;
+
 type
   eKey = eLangKeys;
 
@@ -377,6 +385,8 @@ other - local
     function  getBody: TSymBlock;
     function  GetCaption: string; override;  //for meta-file output
   public
+    //ExtName, //for: external name <name>
+    LibName: string; //for: external <lib>
     Params: TScopeC;
     //Locals: TScopeC;
     destructor  Destroy; override;
@@ -780,6 +790,7 @@ const
 var
   i: integer;
   sc: TSymClass;
+  proc: TSymProc absolute Result;
 begin
   sc := SymClasses[AKind];
   i := IndexOf(AName);
@@ -838,6 +849,11 @@ begin
         Result.StrVal := AVal;
       end;
     end;  //else keep old val?
+  end;
+//external reference?
+  if (FromLib <> '') and (Result is TSymProc) then begin
+    proc.LibName := FromLib;
+    FromLib :=''; //valid only for this proc
   end;
 end;
 

@@ -84,6 +84,7 @@ Overwrite in derived (writing) classes:
     //expected: eToken; //expected token kind(?)
     function  DefString(argName: TArgName): string;
   //inherited
+    function  unGet: boolean; override;
     //procedure rewind; override; //mark locked
     //function  firstToken: eToken; override; //opt. start auto-record
     //function  nextToken:  eToken; override; //HLL filter
@@ -493,7 +494,7 @@ function TTokenStream.unGet: boolean;
 begin
 //debug
   Result := False;  //illegal call
-  assert(False, 'illegal call');
+  assert(False, 'illegal call of unGet');
 end;
 
 { TTokenArray }
@@ -590,6 +591,13 @@ begin
     Result := t_eof;
   if Result <> t_eof then
     inc(iNext);
+end;
+
+function TTokenArray.unGet: boolean;
+begin
+  Result := iNext > 0;
+  if Result and (iNext < FCount) then //else next=eof
+    dec(iNext);
 end;
 
 function TTokenArray.GetPosition: integer;

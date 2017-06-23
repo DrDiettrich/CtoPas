@@ -86,8 +86,7 @@ type
 
   eBuiltin = (
     bmFile, bmLine,
-    bmPragma,  //_Pragma ( "str" )
-    bmExtern  //derive external lib name from symbol name
+    bmPragma  //_Pragma ( "str" )
   );
 
   TMacroBuiltin = class(TMacro)
@@ -97,11 +96,55 @@ type
     function  Expand(src: TTokenStream): TMacroTokens; override;
   end;
 
+  eKnownLibs = (
+    advapi32,
+    kernel32,
+    mpr,
+    version,
+    comctl32,
+    gdi32,
+    opengl32,
+    user32,
+    wintrust,
+    msimg32
+  );
+
+  TMacroLibs = class(TMacro)
+  public
+    //symID: integer; //of const ... = '...dll';
+    libID: eKnownLibs;
+    class procedure Init;
+    function  Expand(src: TTokenStream): TMacroTokens; override;
+  end;
+
+type
+  RKnownLibs = record
+    mac: string; //WIN...API
+    lib: string; //lib name
+    sym: string; //lib name constant
+  end;
+
+const //public for interface section in ToPas
+//todo: check API symbol names
+  KnownLibs: array[eKnownLibs] of RKnownLibs = (
+    //_RTLENTRY ? -> allow to use C functions?
+    (mac:'WINADVAPI'; lib:'advapi32.dll'; sym: 'advapi32'),
+    (mac:'WINBASEAPI'; lib:'kernel32.dll'; sym:'kernel32'),
+    (mac:'WINMPRAPI'; lib:'mpr.dll'; sym:'mpr'),
+    (mac:'WINVERAPI'; lib:'version.dll'; sym:'version'),
+    (mac:'WINCOMAPI'; lib:'comctl32.dll'; sym:'comctl32'),
+    (mac:'WINGDIAPI'; lib:'gdi32.dll'; sym:'gdi32'),
+    (mac:'WINGLAPI'; lib:'opengl32.dll'; sym:'opengl32'),
+    (mac:'WINUSERAPI'; lib:'user32.dll'; sym:'user32'),
+    (mac:'WINTRUSTAPI'; lib:'wintrust.dll'; sym:'wintrust'),
+    (mac:'WINIMGAPI'; lib:'msimg32.dll'; sym:'msimg32')
+  );
+
 implementation
 
 uses
   SysUtils,
-  uUI;
+  uUI, uTablesC;
 
 
 { TMacroTokens }
@@ -289,11 +332,17 @@ class function TMacro.Define(pFile: TFileC): TMacro;
 var
   sym:  RSymPrep;  //symbol to define
   parent: TSymList;
+  id: integer;
 begin
   sym := ScanSym;
   parent := Symbols;
 //macro kind? - passed as Self
-  Result := self.CreateIn(parent, ScanText);  //, False);
+//reuse existing (predefined) macro?
+  TObject(Result) := sym.GetMacro;
+  if (Result = nil) or not (Result is TMacro) then
+    Result := self.CreateIn(parent, ScanText)  //, False);
+  else if Result is TMacroLibs then
+    ; //beep; //debug: expect predefined macro
 //record definition
   Result._Define(pFile);  //at symbol
 //finish macro treatment
@@ -411,10 +460,12 @@ type
     name: string;
     kind: eBuiltin;
   end;
+
 const
   Builtins: array[eBuiltin] of RBuiltin = (
     (name:'__FILE__'; kind:bmFile),
-    (name:'__LINE__'; kind:bmLine)
+    (name:'__LINE__'; kind:bmLine),
+    (name:'_Pragma'; kind:bmPragma)
   );
 
 function TMacro.peekBody(offset: integer): PPreToken;
@@ -1011,16 +1062,6 @@ function TMacroBuiltin.Expand(src: TTokenStream): TMacroTokens;
   }
   end;
 
-  (* Derive DLL name from symbol name, for external procedures.
-    Store in uToPas.LibRef, as quoted string?
-    String table where?
-  *)
-  procedure defLib();
-  begin
-    //...
-    //t.stringID := StringTable.Add(s); //mapString(s);
-  end;
-
 begin
   case which of
   bmFile:
@@ -1036,12 +1077,6 @@ begin
       ScanToken.ival := TokenStack.CurFile.CurLine;
     end;
   bmPragma: _Pragma();
-  bmExtern:
-    begin
-      defLib();
-      Result := inherited Expand(src); //expand #defined body
-      exit; //skip common "done" section
-    end;
   else  //default
     assert(False, 'unhandled builtin macro');
     ScanToken.kind := t_empty;
@@ -1063,7 +1098,37 @@ begin
 end;
 
 
+{ TMacroLibs }
+
+function TMacroLibs.Expand(src: TTokenStream): TMacroTokens;
+begin
+//remember name for declaration of the current procedure (being parsed)
+//todo: change lib into sym, when const symbols have been created
+  FromLib := KnownLibs[self.libID].sym;
+  Result := inherited Expand(src); //expand defined macro
+end;
+
+class procedure TMacroLibs.Init;
+var
+  i: eKnownLibs;
+  mac: TMacroLibs;
+begin
+(* Create the preprocessor symbol
+  and const symbol? (no macro filter active!)
+*)
+  for i := low(i) to high(i) do begin
+  //no symbols defined right now!
+  //todo: create const sym in ToPas
+    mac := TMacroLibs.CreateIn(Symbols, KnownLibs[i].mac);
+    mac.libID := i;
+    Symbols.defMacro(mac.ListIndex, skMacro);
+  //flag as undefined, allow for redefinition
+    Symbols.ChangeState(mac.ListIndex, msUndef);
+  end;
+end;
+
 initialization
   assert(Symbols <> nil, 'init Symbols first!');
   TMacroBuiltin.Init;
+  TMacroLibs.Init;
 end.
