@@ -1078,8 +1078,18 @@ type
       end;  //t_sym
     else
       Log('unexpected #include filename', lkSynErr);
-      exit;
+      //exit;
     end; //case Result
+
+//consume tokens up to t_eol here???
+
+//check for parsed filename
+    if fn = '' then begin
+      //Log('unexpected #include filename representation', lkErr);
+      Log('unexpected #include filename', lkSynErr);
+      //Result := ???
+       exit;
+    end;
 
     case ikind of
     ikStd:  f := IncludeFile(fn);

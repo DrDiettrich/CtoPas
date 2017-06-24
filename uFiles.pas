@@ -306,7 +306,7 @@ begin
   else begin
     Result := Files.NewFile(d, f, fkInclude);
     if Result <> nil then
-      Result.foundWhere := -1;  //not in include path!
+      Result.foundWhere := di; //? -1;  //not in include path!
   end;
 end;
 
