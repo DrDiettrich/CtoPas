@@ -332,7 +332,7 @@ class function TMacro.Define(pFile: TFileC): TMacro;
 var
   sym:  RSymPrep;  //symbol to define
   parent: TSymList;
-  id: integer;
+  //id: integer;
 begin
   sym := ScanSym;
   parent := Symbols;

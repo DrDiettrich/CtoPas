@@ -114,6 +114,7 @@ type
     function  _nextRaw(fSkip: boolean; fMode: eScanMode): eToken;
     function  handleDirective: eToken;
   public
+    atBOL: boolean; //# means directive
     mode: eSrcMode; //C, Meta...
     src:  TFile;
     CurLine: integer; //to be renamed?
@@ -944,6 +945,7 @@ begin
     ScanningFile := self.src.name;
     ScanningLine := CurLine;
     //ScanningText := LineBuf; - not yet valid
+    atBOL := True;
   end;  //else not file based
   nextLine;
 end;
@@ -1194,7 +1196,6 @@ begin //handleDirective - called at '#'
   Result := self._nextRaw(False, smStd);
   if Result = t_sym then begin
     dirName := ScanSym.FString;
-    //dir := Directives.findDirective(dirName);
     dir := Directives.getDirective(ScanSym.dirkind);
     if dir = nil then begin
       Log('unhandled #' + dirName, lkConfig);
@@ -1276,6 +1277,7 @@ begin
 //handle no-file (src = nil)
   Result := (src <> nil) and (CurLine < src.Count);
   if Result then begin
+    atBOL := True; //# directive flag
     LineBuf := src.Strings[CurLine];
     ScanningText := LineBuf;
     if fVerbose then
@@ -1707,7 +1709,7 @@ begin
       c := pc^; inc(pc);
       case c of
       #0: //eol
-          tryNextLine(t_bol);
+          tryNextLine(t_bol); //set atBol
       '!':  mkOp(logNOT);
       '"':  //if fHeader then scanHeader('"') else _scanString(t_str);
         case fMode of
@@ -1826,6 +1828,9 @@ begin
   ScanToken.kind := Result;
   ScanToken.len := pc - ScanToken.pc;
   ScanningNext := pc; //pcN
+//track BOL?
+  if atBOL and not (Result in [opSharp, t_empty, t_rem]) then
+    atBOL := Result = t_bol; // False;
 end;
 
 (* nextToken: handle directives, locks
@@ -1840,7 +1845,10 @@ begin
   repeat
     Result := self._nextRaw(Flock > 0, smStd);
     if Result = opSharp then begin
-      Result := handleDirective;  //even if locked!
+      if atBOL then
+        Result := handleDirective  //even if locked!
+      else  //else unexpected #, operator allowed only inside macro body
+        Log('unexpected #', lkWarning);
     end;
   until (Flock = 0) or (Result = t_eof);
 end;
