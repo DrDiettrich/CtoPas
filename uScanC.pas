@@ -1249,7 +1249,7 @@ begin //handleDirective - called at '#'
       end;
     end;  //else NULL directive?
   end;
-//finish, skip to EOL
+//finish directive, skip to EOL
   if not fError then begin
     Result := ScanToken.kind;
     if not (Result in [t_eof, t_err, t_bol]) then begin
@@ -1258,6 +1258,9 @@ begin //handleDirective - called at '#'
         Result := self._nextRaw(True, smStd);
       until Result in [t_eof, {t_err,} t_bol];
     end;
+  //must exit after #include!
+    if dir.kind in [pdInclude, pdIncludeNext] then
+      Result := t_empty; //always?
   end;  //else #error directive, return as scanned.
   if FLockDelay then begin
     FLockDelay := False;
@@ -1290,7 +1293,7 @@ begin
       //else OnLineChange(lcOpenFile, self);
     end;
   end else
-    pcN := PChar(empty);
+    self.pcN := PChar(empty);
 end;
 
 (* _nextRaw - file lexer
