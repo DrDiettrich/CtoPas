@@ -343,6 +343,12 @@ begin
     Result := self.CreateIn(parent, ScanText)  //, False);
   else if Result is TMacroLibs then
     ; //beep; //debug: expect predefined macro
+{$IFDEF Origin}
+//remember origin? v2004+
+  Result.OrgName := ScanningFile; // pFile.src.name;
+  Result.OrgLine := ScanningLine; // pFile.CurLine;
+{$ELSE}
+{$ENDIF}
 //record definition
   Result._Define(pFile);  //at symbol
 //finish macro treatment

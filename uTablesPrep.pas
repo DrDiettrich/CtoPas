@@ -144,6 +144,13 @@ type
   //TSymMacro = class(TXStrings)
   TSymMacro = class(TSymbol)
   public
+  {$IFDEF Origin} //v2004+
+    //nameID:   integer;  //for non-macros: index of symbol entry
+    //OrgFile:  TTokenStream; //  TFileC; //in uScanC - circular ref!
+    OrgName:  string; //symbol origin file
+    OrgLine:  integer;
+  {$ELSE}
+  {$ENDIF}
     //in TSymbol
     function  BodyString: string; override;  //definition (tokens, only)
     constructor Create(const AName: string; AKey: integer = 0); override;
