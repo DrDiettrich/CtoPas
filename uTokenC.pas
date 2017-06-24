@@ -30,8 +30,8 @@ type
   t_symNX, t_argNX:  don't expand this symbol or argument, because:
     macro name inside macro body (sym)
     macro already expanding, called without required arguments...
-    left hand side of ## operator (sym or arg)
-    right hand side of # operator (arg)
+    left or right hand side of ## operator (sym or arg)
+    right hand side of # operator (t_argNX)
 *)
   eToken = (
     t_empty,
@@ -51,8 +51,10 @@ type
     t_arg, t_argNX,
   //parser specific, mapped from t_sym
     //t_type, t_const,
-  //preprocessor operators
-    opSharp, op2Sharp, opSharpAt, // # ## #@
+  //preprocessor operators # ## #@
+    opSharp, //directive or stringifier, add nopSharp (invalid) by default
+    op2Sharp, //todo: nopSharp, nop2Sharp
+    opSharpAt, //MSC specific!
   //operators - sorted within lines
 {$IFDEF opMul}
     opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &

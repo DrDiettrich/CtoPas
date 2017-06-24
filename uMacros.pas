@@ -66,6 +66,7 @@ type
 
   TMacroArg = record  //class(TTokenArray)
     symID:  integer;
+  //argument usage inside macro body: number of un/expanded uses
     rawRefs, expRefs: integer;  //optimize expansion
   end;
 
@@ -651,7 +652,7 @@ begin
   inherited;
 end;
 
-(* expand - handle possible macro expansion
+(* expand - handle possible function macro expansion
 
 1. When the macro expects arguments...
 1.1 When no "(" is found, no expansion/substitution takes place.
@@ -659,6 +660,7 @@ end;
 1.3 Each argument is prescanned, for macros, which are expanded.
     The result is put into an new token stream,
     which also is part of the argument object.
+    (both unexpanded and expanded argument streams are retained for later use)
 2. The macro body is expanded.
 2.1 The macro is flagged as no-expand, to prevent recursive expansion.
 2.2 The macro tokens are copied to the output stream,
@@ -666,18 +668,20 @@ end;
     after # or around ##, in the non-expanded form.
     When the token of a just expanding macro is encountered, it is not expanded,
     and it is marked for no-expand in the future (t_sym -> t_symNX).
-2.3 The # operator expects an macro argument, whose tokens are put into a single
+2.3 The # operator expects a macro argument, whose tokens are put into a single
     new string literal. Whitespace between the tokens is reduced to 1 space.
-  Note: the constructed string doesn't fully conform to the C specs,
+? Note: our constructed string doesn't fully conform to the C specs, (still?)
     instead the string is usable in other programming languages.
 2.4 The ## operator is processed, by removing every ## operator and
     concatenating the immediately preceding and following tokens into a new token.
+    Placemarker tokens are not concatenated, are removed.
     The result shall be a new valid token - presumably of the kind of the left
     operand? (symbol, number - what else?) ToDo!
 3. The resulting token stream replaces the macro invocation tokens.
-    Each token is subject to macro expansion when the stream is processed.
+    Each token is subject to macro expansion when the stream is processed,
+    unless marked as no-expand (t_symNX).
 3.1 When the end of the macro replacement stream has been reached, the
-    macro expansion is re-enabled.
+    macro expansion is re-enabled. (when the stream is popped off the file stack)
 
 Stream limits
   During argument prescan only the tokens of the actual argument are available
@@ -700,24 +704,28 @@ Parentheses
 
 Lookahead
   The test for the presence of an actual argument list requires lookahead.
+  (A '(' must follow the macro name immediately?)
 
   Also the ## operator deserves lookahead. This kind of lookahead is implemented
-  in the macro body token stream.
+  in the macro body token stream. (tokens accessible by index)
+
+To come: # and ## operators are not always valid, flag as nopSharp and nop2Sharp.
+  Must be handled in examination of the token kind!
 
 # operator
-  The # operator expects an macro argument to follow. All unexpanded(!) tokens
-  of the actual argument are put into an common string, with a blank in between
+  The # operator expects a macro argument to follow. All unexpanded(!) tokens
+  of the actual argument are put into a common string, with a blank in between
   when the tokens were separated by one or more spaces. The resulting string
   token replaces both the # operator and argument tokens.
 
 ## operator
-  The ## operator is handled after argument substitution in macro expansion.
+  The ## operator is handled after argument substitution and before macro expansion.
   The created (expanded) token stream is inspected for ## operators, and every
   such operator and its immediately circumvening tokens are substituted by a
   new token.
   To prevent reallocation, the result replaces the last token (right hand side
   operand), the other two tokens are marked as empty. This process can be
-  repeated, when the next token again is an ## operator.
+  repeated, when the next token again is a ## operator.
 *)
 //function TMacroFunc.expand: eToken;
 function  TMacroFunc.Expand(src: TTokenStream): TMacroTokens;
@@ -748,7 +756,7 @@ var
       //Result := @(RawArgs[id].Tokens[0])
       p := RawArgs[id];
     assert(p <> nil, 'arg not scanned');
-    assert(p.Tokens <> nil, 'arg without tokens');
+    assert(p.Tokens <> nil, 'arg without tokens'); //allowed???
     Result := @p.Tokens[0];
   end;
 {$ENDIF}
@@ -760,8 +768,8 @@ var
     iArg: integer;
     level: integer;
   begin
-    SetLength(RawArgs, numArgs);
-    SetLength(ExpArgs, numArgs);
+    SetLength(RawArgs, numArgs); //record now
+    SetLength(ExpArgs, numArgs); //expand on demand
     if numArgs = 0 then
       exit;
     //src.expectRaw(opLPar, 'expected argument list'); - already skipped!
@@ -797,7 +805,7 @@ var
           dec(level);
           if level > 0 then
             pArg.addToken
-          else begin
+          else begin //argument list finished
             pArg.endRecord;
             pArg := nil;
           end;
@@ -839,11 +847,12 @@ var
         Result := True;
 {$ENDIF}
         pExp := TMacroTokens.Create;
-        pExp.startRecord;
-        ExpArgs[iArg] := pExp;
+        pExp.startRecord; //expansion
+        ExpArgs[iArg] := pExp; //stream available later
         pArg := RawArgs[iArg];
         t := pArg.firstToken;
       //try: handle empty args around ## operator - occurs in GNU headers!
+      //use t_empty for placemarker
         if t = t_eof then begin
           ScanToken.kind := t_empty;
           pExp.addToken;
@@ -906,7 +915,7 @@ var
     s := '';
     t := pArg.firstToken;
     while t <> t_eof do begin
-      s := s + TokenString;
+      s := s + TokenString; //should insert spaces if required (taWhiteBefore)
       t := pArg.nextRaw;
     end;
     pArg.rewind;
@@ -923,9 +932,15 @@ begin
   Result.fromMacro := self;
   Result.startRecord;
   ScanToken.kind := t_symNX;  //don't expand self again
-//start lookahead
+
+//start lookahead - '(' must follow immediately?
+(* Following tokens are recorded, so that they can be used if no '(' follows.
+  If not present, Result replaces the token stream to be parsed.
+  The macro name itself is retained as first token in this stream.
+*)
   repeat
     Result.addToken;  //starting with ourself as no-expanding token
+    //why copy everything, including whitespace? !required if no ( follows!
   until not (src.nextRaw in WhiteTokens);
 //check again
   if ScanToken.kind <> opLPar then begin
@@ -935,11 +950,9 @@ begin
     Result.fTemp := True; //discard after use
     exit;
   end;
-//now we just got an "("
+//now we just got a "("
 
 //step 2: parse argument list
-  //src.nextNoEof(True);  //skip "("
-  //src.nextRaw;  //skip "("
   if numArgs > 0 then
     scanActualArgs; //stop on ")"
 
@@ -974,7 +987,8 @@ begin
     t_arg, t_argNX:  //insert arg
       begin
         pArg := ArgPtr(pBody.argID, pBody.kind = t_arg);
-        assert(pArg <> nil, 'arg not expanded?');
+      //todo: empty args are allowed! but deserve handling!
+        //assert(pArg <> nil, 'arg not expanded?'); //deserves handling!
         while pArg.kind <> t_eof do begin
           Result.putToken(pArg);
           inc(pArg);
@@ -997,6 +1011,7 @@ begin
   if self.fConcat then
     Result.concat;
 
+//macro locked until result stream has been processed.
 //ScanToken may be anything now, so...
   ScanToken.kind := t_empty;  //mark invocating token consumed
 end;
