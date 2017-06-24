@@ -301,6 +301,8 @@ begin
   t_sym, t_symNX:
     Result := Symbols.Strings[t.symID];
   //t_arg: - unexpected
+  t_int:
+    Result := IntToStr(t.ival); //__LINE__
   else  //Warning: is this appropriate for ALL other tokens?
     if t.kind in ConstTokens then
       Result := TokenNames[t.kind]
@@ -349,6 +351,8 @@ begin
     else
       Result := AnsiToC(TokenText(ScanToken),
         delims[ScanToken.kind], taLong in ScanToken.attrs);
+  t_int:
+    Result := IntToStr(ScanToken.ival);
   t_sym, t_symNX:
     Result := Symbols.Strings[ScanToken.symID];
 {argument handling is up to the caller!
@@ -387,7 +391,7 @@ begin
       if pSrc.fCont and TokenStack.pop then
         //continue
       else
-        exit; //return EOF
+        exit; //return EOF when all files are processed
     end;
   until Result > t_eof;
 end;
@@ -436,8 +440,13 @@ begin
   ToDo: drop all open macros, call TokenStack.CurFile._nextRaw(True?, smEol)
 *)
   if Result = opDivDiv then begin     // RP added  these 3 lines
+  (* MSC assumes that /##/ is treated as a comment start!
+    Since such constructs do not occur in ordinary code,
+    we do what MSC means and skip to the next line.
+  *)
     while not (Result in [t_bol, t_eof]) do
-       Result := pSrc.nextToken;
+       //Result := pSrc.nextToken;
+       Result := nextNoEof(False); //returns t_eof only if file stack empty
   end;
   if fLogLines then begin
   //delay logging by 1 token
@@ -1035,6 +1044,11 @@ type
     f:  TFile;
     strm: TTokenStream;
   begin
+  (* The immediately following token has been read, in header scan mode.
+    It must be a string (header name) or a macro name (to be expanded).
+    After expansion, a '<' token may indicate a system file name,
+      but is not handled yet. !Macro has not been scanned in header mode!
+  *)
     case Result of
     t_str:  //pp header-name, saSysHdr is set for <...> format
       begin
@@ -1055,14 +1069,16 @@ type
           end;
           if ScanToken.kind <> t_str then
             assert(false, 'unexpected header macro');
+            //todo: get stream text and scan in header mode?
           fn := TokenText(ScanToken); // StringTable.Strings[ScanToken.strID];
           //handle sys files? - #define mac <...> will most likely scan as garbage
-        end;
-      end;
+        end; //expand
+      end;  //t_sym
     else
       Log('unexpected #include filename', lkSynErr);
       exit;
-    end;
+    end; //case Result
+
     case ikind of
     ikStd:  f := IncludeFile(fn);
     ikSys:  f := IncludeSysFile(fn);
@@ -1091,7 +1107,8 @@ type
     //ScanToken.kind := t_err;
   //get error message - throw exception?
     if self._nextRaw(False, smEol) = t_rem then
-      Log('#error ' + ScanSym.FString, lkSynErr)
+      //Log('#error ' + ScanSym.FString, lkSynErr)
+      Log('#error ' + ScanText, lkSynErr)
     else  //no text?
       Log('#error', lkSynErr);
     Result := t_err;  //treat as error, regardless of actual token kind
@@ -1103,7 +1120,8 @@ type
     //ScanToken.kind := t_empty;
   //get error message - throw exception?
     if self._nextRaw(False, smEol) = t_rem then
-      Log('#warning ' + ScanSym.FString, lkWarning)
+      //Log('#warning ' + ScanSym.FString, lkWarning)
+      Log('#warning ' + ScanText, lkWarning)
     else
       Log('#warning', lkWarning);
     //Result := t_empty;  //??? - how to preserve the string?
@@ -1702,8 +1720,8 @@ begin
         end;
       '#':  //preprocessor - directive or operator
         case pc^ of
-        '#':  mkOp2(op2Sharp);
-        '@':  mkOp2(opSharpAt);
+        '#':  mkOp2(op2Sharp); //todo: nop2sharp
+        '@':  mkOp2(opSharpAt); //MSC only!?
         else  Result := opSharp;
         end;
       '%':  mkOp(opMOD);
@@ -1865,7 +1883,7 @@ var
   strm: TTokenStream;
 begin
   if IsExpandablePrep(sym) then begin
-    strm := TMacro(ScanSym.FMacro).Expand(pSrc);
+    strm := TMacro(Sym.FMacro).Expand(pSrc);
     if strm = nil then
     //expands to a single token
       Result := ScanToken.kind

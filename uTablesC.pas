@@ -725,6 +725,7 @@ begin
 //include handler
   uFiles.PreInclude := AllTypes.HandleDefFiles;
 {$ENDIF}
+  ScanningFile := 'built-in'; //prevent error
 //keyword alias
   Symbols.addKey('__const', Kconst);
 //"inline" may not be known to all compilers?
@@ -2304,6 +2305,7 @@ constructor TTypeDef.Create(const AName: string; AKey: integer);
 begin
   inherited;
   self.kind := stTypedef;
+  //org...
 end;
 
 function TTypeDef.GetCaption: string;
