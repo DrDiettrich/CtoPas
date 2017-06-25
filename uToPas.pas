@@ -217,7 +217,9 @@ const
     //t_type, t_const,
   //preprocessor operators
     (n:'???'; t:poType), //opSharp,
+    (n:'???'; t:poType), //nopSharp,
     (n:''; t:poErr), //op2Sharp,
+    (n:''; t:poErr), //nop2Sharp,
   //!!!if opCast=opSharpAt!!!
     (n:'???'; t:poCast), //opSharpAt, // # ## #@
     //(n:''; t:poErr), //opSharpAt, // # ## #@

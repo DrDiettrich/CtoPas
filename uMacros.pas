@@ -43,6 +43,7 @@ type
 {$ENDIF}
   //track macro usage
     _fExpanding:  boolean; //no more recursive expansion
+    fConcat:  boolean; //contains ##?
     procedure SetExpanding(state: boolean);
     property fExpanding: boolean read _fExpanding write SetExpanding;
   protected
@@ -75,7 +76,6 @@ type
     Args: array of TMacroArg; //descriptions
     numArgs:  integer;
     fVariadic:  boolean;
-    fConcat:  boolean;
     procedure addArg(symID: integer);
     function  argName(id: integer): string; override;
     procedure addToken; override;
@@ -185,13 +185,11 @@ var
     end;
   end;
 
-begin
+begin //concat
 //## invalid as first or last (before EOF) token
-(* ToDo: Needs update according to old ToPas!
-  add and mark invalid occurence as nop2Sharp.
-*)
   if FTokens[0].kind = op2Sharp then begin
     Log('Tokens[0]=##', lkSynErr);
+    FTokens[0].kind := nop2Sharp; //disable
   end;
   for i := 1 to high(FTokens) - 2 do begin  //exclude first and last
     if FTokens[i].kind = op2Sharp then begin
@@ -214,8 +212,10 @@ begin
         //ScanText := Symbols.Strings[ScanToken.symID]; //unique string
 {$ELSE}
         StringScanner.scanString(ScanText);
-        if ScanningNext^ <> #0 then
-          Log('bad ## result', lkSynErr);
+        if ScanningNext^ <> #0 then begin //token not until end of string
+          Log('bad ## result from "'+ScanText+'"', lkSynErr);
+          FTokens[i].kind := nop2Sharp; // t_empty; //ignore this occurence???
+         end;
 {$ENDIF}
         ScanToken.pc := nil;  //means: synthetic token!
         FTokens[i+1] := ScanToken;
@@ -227,7 +227,7 @@ begin
   i := high(FTokens) - 1;
   if FTokens[i].kind = op2Sharp then begin
   //special case, in GNU bits/mathcalls.h
-    FTokens[i].kind := t_eof; // t_empty; //retain first arg
+    FTokens[i].kind := nop2Sharp; // t_eof; // t_empty; //retain first arg
   end;
 //rewind, but don't destroy!
   iNext := 0;
@@ -388,6 +388,15 @@ begin
         ScanToken.kind := t_symNX;
       end;
     end;
+  opSharp:
+    begin
+      ScanToken.kind := nopSharp; //ignore if not followed by t_arg
+    end;
+  nop2Sharp:
+    begin
+      ScanToken.kind := op2Sharp; //execute in macro body
+      fConcat := True;
+    end;
   end;
 //now add it
   Body.addToken;
@@ -425,11 +434,35 @@ begin
 end;
 
 function TMacro.Expand(src: TTokenStream): TMacroTokens;
+var
+  pBody: PPreToken;
 begin
+//handle ##
+  ScanToken.kind := t_symNX;  //use symbol unexpanded
   if self.fExpanding then begin
     Log('recursive expansion attempt', lkBug);
     Result := nil;
-    ScanToken.kind := t_symNX;  //use symbol unexpanded
+    exit;
+  end;
+
+  if fConcat then begin
+    Result := TMacroTokens.Create;
+    Result.fromMacro := self;
+    Result.startRecord;
+  //copy tokens for concat()
+    pBody := @Body.Tokens[0];
+    while pBody.kind <> t_eof do begin
+      case pBody.kind of
+      t_empty, t_NoEol, t_rem:  //skip?
+        ;
+      t_eof:  break;  //in outer loop itself?
+      else
+        Result.putToken(pBody);
+     end; //case
+      inc(pBody);
+    end;
+    Result.endRecord; //copy finished
+    Result.concat; //entire body stream
   end else begin
   //debug
     //if fVerbose then Log('Expanding ' + name, lkDiag);
@@ -438,14 +471,18 @@ begin
     if (Result = nil) or (Length(Result.Tokens) <= 1) then begin
       Result := nil;
       ScanToken.kind := t_empty; //empty substitution
+(* no more found?
     end else begin
       if Result.Tokens[0].pc = '/##/' then begin  // {RP}
         Result := nil;
         ScanToken.kind := opDivDiv;
       end else
         Self.fExpanding := True; //reset when expansion finished
+*)
+      exit; //don't flag expanding
     end;
   end;
+  Self.fExpanding := True; //reset when expansion finished
 end;
 
 (* toString - dump macro definition
@@ -579,9 +616,12 @@ begin
           if Args[i].symID = id then begin
           //replace by actual argument
             ScanToken.argID := i;
-          //check for RHS of ##!
+          //check for RHS of # and ##!
+            if (Body.iNext > 0) then
+              t := @Body.Tokens[Body.iNext - 1];
             if (Body.iNext > 0)
-            and (Body.Tokens[Body.iNext - 1].kind = op2Sharp) then begin
+            //and (Body.Tokens[Body.iNext - 1].kind = op2Sharp) then begin
+            and (t.kind in [opSharp, nopSharp, op2Sharp]) then begin
               ScanToken.kind := t_argNX;
               inc(Args[i].rawRefs);
             end else begin
@@ -593,8 +633,16 @@ begin
         end;
       end;
     end;
+
+  opSharp:
+    begin
+      ScanToken.kind := nopSharp; //re-enable only if followed by t_arg
+    end;
+
+  nop2Sharp,
   op2Sharp: //mark LHS as no-expand, inc. kind to ...NX. RHS see above!
     begin
+      ScanToken.kind := op2Sharp;  //execute in macro body
       self.fConcat := True; //requires postscan to eval ## operators
       t := @Body.Tokens[Body.iNext - 1];  //iNext past ##???
       case t.kind of
@@ -810,6 +858,11 @@ var
             pArg := nil;
           end;
         end;
+      op2Sharp:
+        begin //## inside body, but as part of argumentlist of another macro(?)
+          ScanToken.kind := nop2Sharp; //found in argument - never reached?
+          pArg.addToken;
+        end;
       else
         pArg.addToken;
       end;
@@ -834,6 +887,7 @@ var
     //pTok: PPreToken;
     //mac:  TMacro absolute ScanSym.FMember;
     t:  eToken;
+    WhiteBefore: boolean;
   begin
     Result := False;
     for iArg := 0 to numArgs - 1 do begin
@@ -864,6 +918,9 @@ var
               ; //skip
             t_sym:  //expand macro?
               if IsExpandableC(@ScanSym) then begin
+              //expand recorded macro, using actual argument tokens
+              //retain taWhiteBefore for #
+                WhiteBefore := taWhiteBefore in ScanToken.attrs;
                 subst := TMacro(ScanSym.FMacro).Expand(pArg);
                 if subst = nil then begin
                 //check token
@@ -873,6 +930,11 @@ var
                 end else begin
                 //inline stream
                   t := subst.firstToken;
+                //retain whitespace - wait for first non-empty token
+                  while t = t_empty do
+                    t := subst.nextToken;
+                  if WhiteBefore then
+                    include(ScanToken.attrs, taWhiteBefore);
                   while t <> t_eof do begin
                     pExp.addToken;
                     t := subst.nextToken;
@@ -926,7 +988,7 @@ var
     Result.addToken;
   end;
 
-begin
+begin //Expand
 //step 1: check for argument list present - else no expansion!
   Result := TMacroTokens.Create;
   Result.fromMacro := self;
@@ -938,12 +1000,18 @@ begin
   If not present, Result replaces the token stream to be parsed.
   The macro name itself is retained as first token in this stream.
 *)
-  repeat
-    Result.addToken;  //starting with ourself as no-expanding token
-    //why copy everything, including whitespace? !required if no ( follows!
-  until not (src.nextRaw in WhiteTokens);
-//check again
-  if ScanToken.kind <> opLPar then begin
+{$IFDEF old}
+   repeat
+     Result.addToken;  //starting with ourself as no-expanding token
+     //why copy everything, including whitespace?
+   until not (src.nextRaw in WhiteTokens);
+ //check again
+   if ScanToken.kind <> opLPar then begin
+{$ELSE}
+// ( must follow immediately!!!
+  Result.addToken; //self
+  if src.nextRaw <> opLPar then begin
+{$ENDIF}
   //no expansion, undo lookahead
     Result.addToken;  //the non-"("!
     Result.endRecord;
@@ -957,7 +1025,7 @@ begin
     scanActualArgs; //stop on ")"
 
 //step 3: check expansion required (args used?)
-  ScanToken.kind := t_empty;  //mark invocating token consumed
+  ScanToken.kind := t_empty;  //mark ) consumed
   if self.Body = nil then begin
     Result.Free;
     Result := nil;

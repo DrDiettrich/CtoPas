@@ -1735,9 +1735,9 @@ begin
         end;
       '#':  //preprocessor - directive or operator
         case pc^ of
-        '#':  mkOp2(op2Sharp); //todo: nop2sharp
+        '#':  mkOp2(nop2Sharp); //## only valid in macro body
         '@':  mkOp2(opSharpAt); //MSC only!?
-        else  Result := opSharp;
+        else  Result := opSharp; //always valid
         end;
       '%':  mkOp(opMOD);
 {$IFDEF opMul}

@@ -52,8 +52,8 @@ type
   //parser specific, mapped from t_sym
     //t_type, t_const,
   //preprocessor operators # ## #@
-    opSharp, //directive or stringifier, add nopSharp (invalid) by default
-    op2Sharp, //todo: nopSharp, nop2Sharp
+    opSharp, nopSharp, //directive or stringifier or invalid
+    op2Sharp, nop2Sharp, //in/out of macro body
     opSharpAt, //MSC specific!
   //operators - sorted within lines
 {$IFDEF opMul}
@@ -211,10 +211,14 @@ const
 //t_eof never must be ignored. t_bol is significant for #define (only).
   WhiteTokensPrep = [t_empty, t_NoEol, t_rem]; //not EOF, not t_bol
   WhiteTokens = WhiteTokensPrep + [t_bol];
-{$IFDEF opMul}
-  ConstTokens = [t_empty..t_NoEol, opAmpersAnd..MaxTokenKind];
+{$IFDEF old}
+ {$IFDEF opMul}
+   ConstTokens = [t_empty..t_NoEol, opAmpersAnd..MaxTokenKind];
+ {$ELSE}
+   ConstTokens = [t_empty..t_NoEol, binAnd..MaxTokenKind];
+ {$ENDIF}
 {$ELSE}
-  ConstTokens = [t_empty..t_NoEol, binAnd..MaxTokenKind];
+  ConstTokens = [t_empty..t_NoEol, opSharp..MaxTokenKind];
 {$ENDIF}
 
 //allow for duplicate op (& -> && etc.)
@@ -266,7 +270,9 @@ const
   //parser specific, mapped from t_sym
     //'<typename>', '<constname>',
   //preprocessor operators
-    '#', '##', '#@',
+    '#', '#',
+    '##', '##',
+    '#@',
   //operators - sorted!
     '&', '&=', '&&',
     '+', '+=', '++',
