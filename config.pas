@@ -1,4 +1,5 @@
-(*** config.pas - include file with global $DEFINEs. ***
+unit config;
+(*** config.pas - was: include file with global $DEFINEs. ***
 
 $DEFINE or undefine the symbols below as appropriate.
 
@@ -43,8 +44,10 @@ Purpose: handle high-level symbol names.
 OFF:  use TSymMacro.altID as reference into the other (Globals, Symbols) table.
 ON:   use RSymPrep.altSym for HLL symbols.
   Add stLocal symbol type (untyped, for naming purposes only)
-*)
 {no more $DEFINE altSym}
+*)
+
+interface
 
 (* delayTags - delay creation of synthetic names for untagged structures?
 Introduced 2006-06
@@ -54,7 +57,7 @@ ON
   Untagged structures are unnamed until really required.
   The first following typename will become the struct name.
 *)
-{$DEFINE __delayTags}
+const __delayTags = True; //{$DEFINE __delayTags}
 
 (* extStorage - use extended storage specifiers?
 Introduced 05-2006
@@ -62,7 +65,7 @@ Introduced 05-2006
   extStorage includes inline and struct/union/enum in the allowed storage class.
   Must propagate into proc def - no sym if no scope given!
 *)
-{.$DEFINE __extStorage}
+const __extStorage = False; // {.$DEFINE __extStorage}
 
 (* ExprTerm - are expressions terminated, or separated?
 Introduced 05-2006.
@@ -79,7 +82,7 @@ Introduced 07-2004.
   nextToken() and nextRaw() functions with mode and filter arguments.
   Common filter function replaces nextNoEof, nextNoWhite etc.
 *)
-{$DEFINE __Filter}
+const __Filter = True; //{$DEFINE __Filter}
 
 (* lclScopes - create and use local scopes
 Introduced 05-2006
@@ -93,7 +96,7 @@ static procedure definitions go into the Statics scope,
 non-static procedures are copies of (or references to) global prototypes,
   owned by the Globals scope.
 *)
-{$DEFINE __lclScopes}
+const __lclScopes = True; //{$DEFINE __lclScopes}
 
 (* oneSTB - scopes have a single symbol table
 Removed 05-2006 - furthermore only support (the new) single lists.
@@ -107,7 +110,7 @@ NO MORE USED
   Define additional unary operators for "*" (^), "&" (@), "+", "-".
   Currently not used, perhaps in the cross compiler?
 *)
-{$DEFINE __opMul}
+const __opMul = True; //{$DEFINE __opMul}
 
 
 (* ParseTree - parse expressions etc. into trees?
@@ -117,12 +120,12 @@ NO MORE USED
 Procedure implementations deserve further considerations.
 Blocks can be implemented as real trees, at least for use as nested scopes.
 *)
-{ $DEFINE __ParseTree}
+const __ParseTree = False; //{ $DEFINE __ParseTree}
 
 (* PreInclude - process *.defs files?
   Currently not enabled, conflicts with fAutoConst
 *)
-{ $DEFINE __PreInclude}
+const __PreInclude = False; //{ $DEFINE __PreInclude}
 
 (* proto - separate prototypes from procedure-definitions
 Introduced 05-2006
@@ -137,11 +140,13 @@ OFF (bug: error saving symbols!!!)
     Modules never must be destroyed, can only be cleared if required.
   Procedures have a definition member with additional scopes etc.
 *)
-{.$DEFINE __proto}
+const __proto = False; //{.$DEFINE __proto}
 
 (* t_num - strict handling of preprocessor numbers.
   I couldn't find any use for that funny number definition.
-*)
 {$UNDEF __t_num}
+*)
 
+implementation
 
+end.

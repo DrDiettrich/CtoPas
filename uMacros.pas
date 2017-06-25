@@ -7,9 +7,8 @@ ToDo:
 
 interface
 
-{$I config.pas}
-
 uses
+  config, //{$I config.pas}
   uXStrings,
   uTokenC, uTablesPrep, uDirectives, uScanC;
 

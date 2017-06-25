@@ -28,9 +28,8 @@ Constant expressions as expressions or value?
 
 interface
 
-{$I config.pas}
-
 uses
+  config, //{$I config.pas}
   uTablesPrep,
   uTablesC, uTokenC;  //only because of eToken!
 
@@ -89,13 +88,13 @@ type
     r:  RType;
     fOldParams: boolean;  //prevent default type "int"
     //procedure Init;
-  {$IFDEF __lclScopes}
+  {$IF __lclScopes}
     constructor Create(AScope: TScopeC);
     procedure Clear;
   {$ELSE}
     constructor Create(fPub: TPublic);  //Create; (AScope: TScope)
     procedure Clear(fPub: TPublic); //Clear;
-  {$ENDIF}
+  {$IFEND}
     destructor  Done;
     property  name: string read r.name;
   public
@@ -253,14 +252,8 @@ string_literal
           end;
         end else begin
           { TODO : check for const/not const symbol }
-        {$IFDEF old}
-          Result := ScanText;
-          //if ScanSym.mackind <> skConst...
-            //include(ParserFlags, pfNotConst);
-        {$ELSE}
           Result := ScopedName; //search symbol in scopes -> CurSym/nil
           //case CurSym.kind...
-        {$ENDIF}
           nextToken;
         end;
       t_arg, t_argNX:
@@ -342,7 +335,7 @@ postfix_expression
         nextToken;
         Result  := cast_expression; //unary_expression;
       end;
-{$IFDEF __opMul}
+{$IF __opMul}
     opSub0,  //- here: unary!
     opMinus1:
       begin
@@ -368,7 +361,7 @@ postfix_expression
     opStar_,  //here: deref
     opSub_,  //- here: unary!
     binAnd_,  //here: AddrOf
-{$ENDIF}
+{$IFEND}
     logNOT, //!
     binNot: //~
       begin
@@ -453,30 +446,30 @@ type
     prHighest
   );
 
-{$IFDEF __opMul}
+{$IF __opMul}
   binops = opAmpersAnd..opTo;
 {$ELSE}
   binops = binAnd_..opTo;
-{$ENDIF}
+{$IFEND}
 
 const
   prLet = prDone;  //force exit?
   prPost = prErr;  //here: error! (postfix_expression)
     //should have been handled in cast->unary!
 
-{$IFDEF __opMul}
+{$IF __opMul}
   binopsS = [opAmpersAnd..opTo];
 {$ELSE}
   binopsS = [binAnd_..opTo];
-{$ENDIF}
+{$IFEND}
 
   Prio: array[binops] of ePrio = (
   //operators - sorted within lines
-{$IFDEF __opMul}
+{$IF __opMul}
     prBinAnd, prLet, prLogAnd,  //opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &
 {$ELSE}
     prBinAnd, prLet, prLogAnd,  //binAnd_, letAND, logAND, // & &= &&, ambiguous: &
-{$ENDIF}
+{$IFEND}
     prAdd, prLet, prPost, //opADD, letADD, opINC,   // + += ++
     prRel, prRel, prShift, prLet, //opLT, opLE, opSHL, letSHL, // < <= << <<=
     prRel, prRel, prShift, prLet, //opGT, opGE, opSHR, letSHR, // > >= >> >>=
@@ -484,7 +477,7 @@ const
 
     prErr, prEq, //logNOT, opNE,   // ! !=
     prMul, prLet, //opMOD, letMOD,  // % %=
-{$IFnDEF __opMul}
+{$IF not __opMul}
     prMul, prLet, //opStar_, letMUL, // * *=, ambiguous: *
 {$ELSE}
     prMul, prLet, //opStar0, letMUL, // * *=, ambiguous: *
@@ -492,7 +485,7 @@ const
     prMul, prErr, prErr,  //opMul2, opPtr1, opDeref1, //classified "*" (binary mul, ptr decl., dereference)
     prbinAnd, prErr,  //binAnd2, opAddr1,   //classified "&" (unary)
     prAdd, prErr, //opSub2, opMinus1,  //classified "-" (unary)
-{$ENDIF}
+{$IFEND}
     prLet, prEq,  //opLet, opEQ,    // = ==
     prExOr, prLet, //opXor, letXOR,  // ^ ^=
 
@@ -505,11 +498,11 @@ const
   //not in op1$
     prPost, prErr, //opDot, op3Dot, // . ..., C++: .*
     prMul, prLet, prErr, //opDiv, letDiv, OpDivDiv, // / /= //     {RP}
-{$IFDEF __opMul}
+{$IF __opMul}
     prAdd, prLet, prPost, prPost //opSub0, letSub, opDec, opTo, // - -= -- ->, C++: ->*
 {$ELSE}
     prAdd, prLet, prPost, prPost //opSub_, letSub, opDec, opTo, // - -= -- ->, C++: ->*
-{$ENDIF}
+{$IFEND}
   );
 
   function  bin_expr(leftOp: ePrio): string;
@@ -983,10 +976,9 @@ var
     if i_ttyp = Kinline then begin
     //special case
       r._inline := True;
-    {$IFDEF __proto}
+    {$IF __proto}
       r.symkind := stInline;  //??? - reserved for macros?
-    {$ELSE}
-    {$ENDIF}
+    {$IFEND}
       Result := True;
       nextToken;
       exit;
@@ -1028,7 +1020,7 @@ var
       r.setNameSym;
     {$ENDIF}
       Result := nextToken <> opBeg;  //done?
-  {$IFDEF __delayTags}
+  {$IF __delayTags}
     //nothing to create for untagged type
   {$ELSE}
     end else if r.storage = KTypedef then begin
@@ -1036,7 +1028,7 @@ var
       r.name := IntToStr(Globals.TypeCount);
       r.nameID := 0;  //todo: substitute typename, if found
       r.loc := ScanSym.loc; //???
-  {$ENDIF}
+  {$IFEND}
     end else
       r.name := '';
     r.makeTagRef(sue, r.name);
@@ -1223,9 +1215,9 @@ function TDeclaration.init_declarator_list: boolean;
       LogBug('no var/const to initialize');
       exit;
     end;
-{$IFDEF __ParseTree}
+{$IF __ParseTree}
     declSym.Definition := TDefinition.Create;
-{$ENDIF}
+{$IFEND}
     r.declSym.StrVal := '<todo: parse expression>';
     if i_ttyp = opBeg then begin
     //initialize structure
@@ -1392,11 +1384,11 @@ MS extension: qualifiers!!!
   pr.Create(r.mbrScope);  //if exists?
   startDecl; //!!! non-reentrant !!!
   while i_ttyp in declarator_qualifierS do begin
-{$IFDEF __opMul}
+{$IF __opMul}
     if i_ttyp in [opStar0, opPtr1] then begin
 {$ELSE}
     if i_ttyp = opStar_ then begin
-{$ENDIF}
+{$IFEND}
     (*
     pointer :
     {"*" [type_qualifier_list]}
@@ -1467,13 +1459,12 @@ MS extension: qualifiers!!!
     end else begin  // "("
     //procedure
       Result := parameter_list; //start with LPar
-    {$IFDEF __proto}
+    {$IF __proto}
       if i_ttyp = opBeg then
         r.symkind := stProc
       else
         r.symkind := stProto;
-    {$ELSE}
-    {$ENDIF}
+    {$IFEND}
     end;
   end;
   if Result then
@@ -1482,7 +1473,7 @@ MS extension: qualifiers!!!
 end;
 
 function TDeclaration.recordExpr: boolean;
-{$IFNDEF __ParseTree}
+{$IF not __ParseTree}
 begin
 { TODO : try: don't terminate expression string - at least here! }
   r.declSym.StrVal := cond_expression; //(False);
@@ -1531,11 +1522,11 @@ begin
     Result := def.Count > 1;  //if , or ; included!?
   end;
 end;
-{$ENDIF}
+{$IFEND}
 
 
 function TDeclaration.recordBlock: boolean;
-{$IFNDEF __ParseTree}
+{$IF not __ParseTree}
 begin
 //start with "{"
   //r.declSym ???
@@ -1591,7 +1582,7 @@ begin
       //check/skip only when recording
   end;
 end;
-{$ENDIF}
+{$IFEND}
 
 function  TDeclaration.compound_statement(proc: TSymProc): boolean;
 var

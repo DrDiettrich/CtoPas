@@ -31,10 +31,9 @@ enum members - nostore as constants - recover/make constants }
 
 interface
 
-{$I config.pas}
-
 uses
   Classes,
+  config, //{$I config.pas}
   uTranslator,
   uTokenC, uTablesC;
 
@@ -248,7 +247,7 @@ const
     (n:' mul'; t:poFunc), //*= letMUL,
 //!!! we don't have disambiguated tokens here!!!
 //unless the writer emitted special codes...
-{$IFDEF __opMul}
+{$IF __opMul}
   // *
     (n:'*'; t:poInfix; p:prMulOp), //opMul,
     (n:'^'; t:poPrefix; p:prUnary), //opPtr, //classified "*"
@@ -259,7 +258,7 @@ const
   // -
     (n:'-'; t:poInfix; p:prAddOp; m:opMinus1), //- opSub/opMinus1
     (n:'-'; t:poPrefix; p:prUnary), //opMinus1,  //classified "-" (unary)
-{$ENDIF}
+{$IFEND}
     (n:':='; t:poInfix), //opLet,
     (n:'='; t:poInfix; p:prRelOp), //opEQ,    // = ==
     (n:' xor '; t:poInfix; p:prAddOp), //opXor,

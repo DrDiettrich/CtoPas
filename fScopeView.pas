@@ -4,10 +4,9 @@ unit fScopeView;
 
 interface
 
-{$INCLUDE config}
-
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  config, //{$INCLUDE config}
   StdCtrls, ExtCtrls,
   uTablesC, ComCtrls;
 

@@ -113,11 +113,10 @@ Macro = "#define" name ["(" { param "," } ")" ] [ "\" body ]
 
 interface
 
-{$I config.pas}
-
 uses
   Classes,  //TStream
   //Contnrs,  //TObjectList
+  config,  //{$I config.pas}
   uFiles, //include handler
   uTablesPrep, //macro handler
   uXStrings, uUI,
@@ -152,10 +151,9 @@ type
       stEnumMember,  //special scoping in C
   //parser created
     stVar,
-  {$IFDEF __proto}
+  {$IF __proto}
     stProto,
-  {$ELSE}
-  {$ENDIF}
+  {$IFEND}
     stProc,
     stTypedef //stay last, special scoping in C
   );
@@ -179,10 +177,9 @@ const
     'e',  //stEnumMember,
   //parser created
     'v',  //stVar,
-  {$IFDEF __proto}
+  {$IF __proto}
     'o',  //stProto,
-  {$ELSE}
-  {$ENDIF}
+  {$IFEND}
     'p',  //stProc,
     't'   //stTypedef //stay last
   );
@@ -196,10 +193,9 @@ const
     'const ', 'enum ',  //stConst, stEnumMember,  //const variable, enum member, #define???
   //parser created
     'var ',   //stVar,
-  {$IFDEF __proto}
+  {$IF __proto}
     'prototype ',
-  {$ELSE}
-  {$ENDIF}
+  {$IFEND}
     'proc ',  //stProc,
     'type '   //stTypedef //stay last
   );
@@ -255,11 +251,11 @@ type
 
   TSymConst = TSymVar;
   TSymEnum = TSymConst;
-{$IFDEF __proto}
+{$IF __proto}
   TSymProto = TSymbolC;  //eventually with virtual extensions for TSymProc?
 {$ELSE}
   TSymProto = TSymVar;  //really common ancestor?
-{$ENDIF}
+{$IFEND}
 
   TTypeDef = class(TSymbolC)
   protected
@@ -314,10 +310,10 @@ other - local
     DefFile:  string;
     //OnProcRead: TOnProcRead;
     OnSymRead: TOnSymRead;
-  {$IFDEF __PreInclude}
+  {$IF __PreInclude}
     //DefPos: integer; - not for text files :-(
     procedure HandleDefFiles(f: TFile);
-  {$ENDIF}
+  {$IFEND}
     //constructor Create(const AName: string; AKey: integer = 0); override;
     procedure SaveToStream(Stream: TStream); override;
     procedure LoadFromFile(const fn: string); override;
@@ -467,7 +463,7 @@ other - local
     procedure makeDim(const dim: string);
     procedure makePointer;
     function  qualify(t: eKey; fSpec: boolean): boolean; //const or volatile
-  {$IFDEF __lclScopes}
+  {$IF __lclScopes}
   //add to LclScope
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
@@ -482,7 +478,7 @@ other - local
     function  makeParam(const Aname, Adef: string): string;
     function  makeVarargs: string;
     procedure makeParams(const params: string);
-  {$ENDIF}
+  {$IFEND}
     procedure finishComplex;
     procedure finishEnum;
     procedure endDecl;  //(fPublic: boolean);
@@ -724,10 +720,10 @@ I __inline
 *)
 procedure InitAlias;
 begin
-{$IFDEF __PreInclude}
+{$IF __PreInclude}
 //include handler
   uFiles.PreInclude := AllTypes.HandleDefFiles;
-{$ENDIF}
+{$IFEND}
   ScanningFile := 'built-in'; //prevent error
 //keyword alias
   Symbols.addKey('__const', Kconst);
@@ -784,10 +780,9 @@ const
     TSymEnum,  //stEnumMember,  //const variable, enum member, #define???
     //stField,  //local in scope (proc, struct...)
     TSymVar,  //stVar,
-  {$IFDEF __proto}
+  {$IF __proto}
     TSymProto,
-  {$ELSE}
-  {$ENDIF}
+  {$IFEND}
     TSymProc, //stProto, stProc,
     TSymType  //stTypedef //stay last
   );
@@ -930,7 +925,7 @@ begin
 end;
 
 
-{$IFDEF __PreInclude}
+{$IF __PreInclude}
 
 (* HandleDefFiles - process definition files
 *)
@@ -984,7 +979,7 @@ end;
 
 {$ELSE}
   //no *.defs handler
-{$ENDIF}
+{$IFEND}
 
 type
   eDefFmt = (fmtUnknown, fmt0, fmt10, fmt11, fmt12);
@@ -1616,12 +1611,12 @@ end;
 
 function TTypeDefs.defProc(const AName, ADef: string): TSymProto;
 begin
-{$IFDEF __proto}
+{$IF __proto}
 //here: prototype
   Result := defSym(stProto, AName, ADef) as TSymProto;
 {$ELSE}
   Result := defSym(stProc, AName, ADef) as TSymProc;
-{$ENDIF}
+{$IFEND}
 end;
 
 function TTypeDefs.closestType(const ADef: string): string;
@@ -1982,7 +1977,7 @@ begin
     if (scope = Globals) and (Statics <> nil) then
       scope := Statics;  //what if nil? (header translation???)
   Ktypedef:
-  {$IFDEF __delayTags}
+  {$IF __delayTags}
     begin //try substitute synthetic name of basetype
       //expect: spec=t{mbrs}, or t:name{mbrs} was already created!
       if basetype = nil then begin
@@ -2023,7 +2018,7 @@ begin
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
     end;
-  {$ENDIF}
+  {$IFEND}
   end;  //case
   if (scope = nil) or (declSym <> nil) then
     exit; //assume nothing to create, or done
@@ -2068,7 +2063,7 @@ But also should distinguish procedures from procedure pointers!
 Since calling conventions can be overridden in VC, they are finished here!
 __inline can be combined with other calling conventions!
 *)
-{$IFDEF __lclScopes}
+{$IF __lclScopes}
 //procedure RType.makeParams;
 procedure RType.makeParams(const params: string);
 var
@@ -2260,7 +2255,7 @@ function RType.makeVarargs: string;
 begin
   Result := makeParam('', '~');
 end;
-{$ENDIF}
+{$IFEND}
 
 
 function RType.getDef: string;
@@ -2358,12 +2353,12 @@ begin
     Result := Result + ' = ' + StrVal;
 end;
 
-{$IFDEF __ParseTree}
+{$IF __ParseTree}
 function TSymbolC.GetTokens: TTokenArray;
 begin
   Result := Definition;
 end;
-{$ENDIF}
+{$IFEND}
 
 (* SetID - remember scanner/preprocessor symID
 This is an approach to create a common public STB.

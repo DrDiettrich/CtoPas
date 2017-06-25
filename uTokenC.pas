@@ -14,7 +14,8 @@ V1: include C keywords, with some Microsoft and C-99 extensions.
 
 interface
 
-{$I config.pas}
+uses
+  config; //{$I config.pas}
 
 type
 (* the following pseudo tokens are defined:
@@ -53,11 +54,11 @@ type
     op2Sharp, nop2Sharp, //in/out of macro body
     opSharpAt, //MSC specific!
   //operators - sorted within lines
-{$IFDEF __opMul}
+{$IF __opMul}
     opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &
 {$ELSE}
     binAnd_, letAND, logAND, // & &= &&, ambiguous: &
-{$ENDIF}
+{$IFEND}
     opADD, letADD, opINC,   // + += ++
     opLT, opLE, opSHL, letSHL, // < <= << <<=
     opGT, opGE, opSHR, letSHR, // > >= >> >>=
@@ -65,7 +66,7 @@ type
 
     logNOT, opNE,   // ! !=
     opMOD, letMOD,  // % %=
-{$IFnDEF __opMul}
+{$IF not __opMul}
     opStar_, letMUL, // * *=, ambiguous: *
 {$ELSE}
     opStar0, letMUL, // * *=, ambiguous: *
@@ -73,7 +74,7 @@ type
     opMul2, opPtr1, opDeref1, //classified "*" (binary mul, ptr decl., dereference)
     binAnd2, opAddr1,   //classified "&" (unary)
     opSub2, opMinus1,  //classified "-" (unary)
-{$ENDIF}
+{$IFEND}
     opLet, opEQ,    // = ==
     opXor, letXOR,  // ^ ^=
 
@@ -86,11 +87,11 @@ type
   //not in op1$
     opDot, op3Dot, // . ..., C++: .*
     opDiv, letDiv, OpDivDiv, // / /= //     {RP}
-{$IFDEF __opMul}
+{$IF __opMul}
     opSub0, letSub, opDec, opTo, // - -= -- ->, C++: ->*
 {$ELSE}
     opSub_, letSub, opDec, opTo, // - -= -- ->, C++: ->*
-{$ENDIF}
+{$IFEND}
   //keywords, sorted
   //operators
     Ksizeof,
@@ -155,11 +156,11 @@ type
   //eLangKeys = Kauto..Kpascal;
   //eLangKeys = Kauto..Kfastcall;
   eLangKeys = Ksizeof..Kstdcall;
-{$IFDEF __extStorage}
+{$IF __extStorage}
   eStorageClass = Kauto..Kunion;
 {$ELSE}
   eStorageClass = Kauto..Ktypedef;
-{$ENDIF}
+{$IFEND}
   eSimpleTypes = Kvoid..Kuint64_t;
 
 const //for the parser!
@@ -194,11 +195,11 @@ const //meta convention(s)
   opPostDec = opDec;  //PreDec = letSub;
 
 const
-{$IFDEF __opMul}
+{$IF __opMul}
   cast_modifierS = [ opStar0, opPtr1, opAddr1 ];
 {$ELSE}
   cast_modifierS = [ opStar_ ];
-{$ENDIF}
+{$IFEND}
   declarator_qualifierS = type_qualifierS + cast_modifierS;
 
 const
@@ -209,42 +210,34 @@ const
 //t_eof never must be ignored. t_bol is significant for #define (only).
   WhiteTokensPrep = [t_empty, t_NoEol, t_rem]; //not EOF, not t_bol
   WhiteTokens = WhiteTokensPrep + [t_bol];
-{$IFDEF old}
- {$IFDEF __opMul}
-   ConstTokens = [t_empty..t_NoEol, opAmpersAnd..MaxTokenKind];
- {$ELSE}
-   ConstTokens = [t_empty..t_NoEol, binAnd..MaxTokenKind];
- {$ENDIF}
-{$ELSE}
   ConstTokens = [t_empty..t_NoEol, opSharp..MaxTokenKind];
-{$ENDIF}
 
 //allow for duplicate op (& -> && etc.)
-{$IFDEF __opMul}
+{$IF __opMul}
   DupOps = [opAmpersAnd, opAdd, opSub0, opLT, opGT, binOR];
 {$ELSE}
   DupOps = [binAnd, opAdd, opSub, opLT, opGT, binOR];
-{$ENDIF}
+{$IFEND}
   //C++: "::"?
 //also allow for assignment (& -> &= etc.)
   LetOps = [
-{$IFDEF __opMul}
+{$IF __opMul}
     opAmpersAnd, opADD,
     opSub0, //special handling for "->"
 {$ELSE}
     binAnd_, opADD,
     opSub_, //special handling for "->"
-{$ENDIF}
+{$IFEND}
     opLT, opSHL, opGT, opSHR,   //both single and duplicated
     binOR,
     logNOT,
     opMOD,
     opDiv, //special handling for "//" and "/*"
-{$IFDEF __opMul}
+{$IF __opMul}
     opStar0,
 {$ELSE}
     opStar_,
-{$ENDIF}
+{$IFEND}
     opLet,
     opXor
   ];
@@ -277,14 +270,14 @@ const
     '!', '!=',
     '%', '%=',
     '*', '*=',
-{$IFDEF __opMul}
+{$IF __opMul}
   //replacements
   //unless better encoding: post-processor must count number of operands!
   //enclose binary operators in " "
     ' * ', ' *', '->', //opMul, opPtr, opDeref, //classified "*"
     ' & ', ' &',  //binAnd, opAddr,   //classified "&" (unary)
     ' - ', ' -',  //opSub, opMinus,  //classified "-" (unary)
-{$ENDIF}
+{$IFEND}
     '=', '==',
     '^', '^=',
     '(', ')',

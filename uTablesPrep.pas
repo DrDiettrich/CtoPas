@@ -35,12 +35,11 @@ ToDo:
 - unique token arrays (nil - empty - t_eof)? for empty token lists.
 *)
 
-{$INCLUDE config.pas}
-
 interface
 
 uses
   Classes,
+  config, //{$INCLUDE config.pas}
   uHashList, uXStrings,
   uFiles, uTokenC;
 

@@ -19,12 +19,12 @@ ToDo:
 - optional C++ support (operators, keywords, alternate tokens)
 *)
 
-{$I config.pas}
 
 interface
 
 uses
   Classes,
+  config, //{$I config.pas}
   uTablesPrep, uFiles, uTokenC;
 
 // ----------------- config -------------------
@@ -75,7 +75,7 @@ eScanMode specifies special actions:
     The scanner returns t_rem or t_empty, stops at EOL
 *)
 
-{$IFDEF __Filter}
+{$IF __Filter}
   eScanMode = (
     //smCSource,  //default, C source files
     smStd,      //default language
@@ -95,7 +95,7 @@ eScanMode specifies special actions:
     smEol,      //skip to EOL, return t_rem or t_empty at EOL
     smMeta      //meta file, internal format for strings, chars...
   );
-{$ENDIF}
+{$IFEND}
 
 type
   eScanState = (
@@ -638,11 +638,11 @@ unary_operator unary_expression
         GTOK();
         Result  := unary_expression ;
       end;
-{$IFDEF __opMul}
+{$IF __opMul}
     opSub0:  begin //-
 {$ELSE}
     opSub_:  begin //-
-{$ENDIF}
+{$IFEND}
         GTOK();
         Result  := -unary_expression ;
       end;
@@ -683,11 +683,11 @@ unary_expression
     Result  := unary_expression ;
     WHILE True do begin
       case i_TTYP of
-{$IFDEF __opMul}
+{$IF __opMul}
       opStar0: // '*'
 {$ELSE}
       opStar_: // '*'
-{$ENDIF}
+{$IFEND}
         begin
           GTOK();
           Result := Result * unary_expression;
@@ -727,11 +727,11 @@ multiplicative_expression {("+" | "-") multiplicative_expression}
           GTOK();
           inc(Result, multiplicative_expression);
         end;
-{$IFDEF __opMul}
+{$IF __opMul}
       opSub0:  //'-'
 {$ELSE}
       opSub_:  //'-'
-{$ENDIF}
+{$IFEND}
         begin
           GTOK();
           dec(Result, multiplicative_expression);
@@ -833,11 +833,11 @@ equality_expression {"&" equality_expression}
   function AND_expression: integer; // &
   begin
     Result  := equality_expression ;
-{$IFDEF __opMul}
+{$IF __opMul}
     WHILE i_TTYP  = opAmpersAnd  do begin
 {$ELSE}
     WHILE i_TTYP  = binAnd_  do begin
-{$ENDIF}
+{$IFEND}
       GTOK();
       Result  := Result  AND equality_expression ;
     end;
@@ -1756,30 +1756,30 @@ begin
         else  Result := opSharp; //always valid
         end;
       '%':  mkOp(opMOD);
-{$IFDEF __opMul}
+{$IF __opMul}
       '&':  mkOp(opAmpersAnd);
 {$ELSE}
       '&':  mkOp(binAnd_);
-{$ENDIF}
+{$IFEND}
       '''': if Mode = smMeta then scanDelimited('''', t_car) else _scanString(t_car);
       '(':  Result := opLPar;
       ')':  Result := opRPar;
-{$IFDEF __opMul}
+{$IF __opMul}
       '*':  mkOp(opStar0);
 {$ELSE}
       '*':  mkOp(opStar_);
-{$ENDIF}
+{$IFEND}
       '+':  mkOp(opADD);
       ',':  Result := opComma;
       '-':
         if pc^ = '>' then
           mkOp2(opTo)
         else
-{$IFDEF __opMul}
+{$IF __opMul}
           mkOp(opSub0);
 {$ELSE}
           mkOp(opSub_);
-{$ENDIF}
+{$IFEND}
       '.':
         if pc^ = '.' then begin
           if pc[1] = '.' then begin

@@ -2,8 +2,6 @@ unit fSymView;
 
 interface
 
-{$INCLUDE config}
-
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls;
@@ -34,6 +32,7 @@ implementation
 {$R *.DFM}
 
 uses
+  config, //{$INCLUDE config}
   uUI,
   uParseC, uFiles,
   uTablesPrep, uTablesC;
