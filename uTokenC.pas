@@ -98,6 +98,7 @@ type
   //operators
     Ksizeof,
   //statements
+    Kasm,
     Kbreak, Kcase, Kcontinue, Kdefault, Kdo,
     Kelse, Kfor, Kgoto, Kif,
     Kreturn, Kswitch, Kwhile,
@@ -318,6 +319,7 @@ const
   //operators
     'sizeof',
   //statements
+    '__asm',
     'break', 'case', 'continue', 'default', 'do',
     'else', 'for', 'goto', 'if',
     'return', 'switch', 'while',
@@ -343,7 +345,7 @@ const
   //add more "standard" data types, like __int8, __uint8?
   //extensions: Microsoft/Windows
     //'cdecl', 'pascal', 'far', 'huge', 'near'
-    '__asm',
+    //'__asm', done
     '__based',
     '__cdecl',
     '__declspec',

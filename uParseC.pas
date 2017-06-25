@@ -613,6 +613,21 @@ begin
   Result := expect(opEnd, 'unterminated block');
 end;
 
+(* quick skip over ignored tokens (asm...)
+  No macro expansion, no directives!
+  Returns False only on t_eof!
+*)
+function skipTo(op: eToken): boolean;
+begin
+//allow for empty block
+  while i_ttyp <> op do begin
+    i_ttyp := nextNoWhite; //raw token, maybe eof
+    if i_ttyp = t_eof then
+      break;
+  end;
+  Result := i_ttyp = op;
+end;
+
 // -------------------------------
 
 //optimization: for strictly temporary use, to bypass implied try/finally
@@ -637,7 +652,7 @@ begin
   end;
 end;
 
-(* statement - return both an string and an error condition.
+(* statement - return both a string and an error condition.
   Append 1 stmt to s.
 *)
 function  statement(scope: TSymBlock; var stmt: string): boolean;
@@ -693,6 +708,30 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
     //exit with s='}'
   end;
 
+  (* Various formats:
+    __asm ... ; <-- the only regular stmt format
+    __asm { ... }
+    { __asm ... }
+
+    Sets overall Result, handles
+  *)
+  procedure __asm(); //sets overall Result!
+  begin
+  //optimized for speed, using raw tokens only!
+    if nextToken = opBeg then begin
+    //this one looks okay, consume '}'
+      Result := skipTo(opEnd); //skipBlock();
+      nextToken; //consume '}'
+      stmt := stmt + ListTerm; //meta!
+      exit; //past '}', no ; follows
+    end;
+  //ordinary stmt, but may NOT be followed by ';' in { __asm ... }
+    //skipTo(opSemi); //must stop ON ';', handled below!
+    repeat
+      i_ttyp := nextNoWhite;
+    until i_ttyp in [t_eof, opEnd, opSemi];
+  end;
+
 {
 var
   SavedFlags: sParserFlags;
@@ -707,6 +746,13 @@ begin //statement
   tempstr := TokenString; //in rare cases this token is NOT added to stmt!!!
 //default: cases fall through to common check for ";" terminator
   case i_ttyp of
+  Kasm:
+    begin
+      stmt := stmt + tempstr + '(...)' + ListTerm;
+      __asm;
+      skip(opSemi);
+      exit;
+    end;
   Kbreak,     //"break;"
   Kcontinue:  //"continue;"
     begin

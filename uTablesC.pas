@@ -694,11 +694,14 @@ begin
     nextToken();
 end;
 
+(* skip expected token.
+  Log msg if it's not the expected token.
+*)
 function  expect(t: eToken; const msg: string): boolean;
 begin
   Result := i_TTYP = t;
   if Result then
-    nextToken()
+    nextToken() //updates i_ttyp
   else
     //Log(msg, lkDiag);
     SynErr(msg);
