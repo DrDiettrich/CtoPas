@@ -111,6 +111,8 @@ type
     procedure LinkPush(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure N2Click(Sender: TObject);
+    procedure lbSrcContextPopup(Sender: TObject; MousePos: TPoint;
+      var Handled: Boolean);
   private
     fAbort: boolean;
     fBusy:  boolean;
@@ -200,6 +202,7 @@ begin
           pos := nil;
       end else
         pos := nil; //debug - msg not while parsing?
+      lbMsg.AddItem(ScanningFile + ':' + IntToStr(ScanningLine), pos); // nil);
       self.lbMsg.Items.AddObject(msg, pos);
     //scroll into view
       i := lbMsg.Items.Count - 5;
@@ -1006,6 +1009,14 @@ end;
 procedure TScanLog.N2Click(Sender: TObject);
 begin
   MacroChecker.Init;
+end;
+
+procedure TScanLog.lbSrcContextPopup(Sender: TObject; MousePos: TPoint;
+  var Handled: Boolean);
+begin
+//try set monitor location
+  MonitoringFile := self.CurFile.name;
+  MonitoringLine := lbSrc.ItemIndex + 1; //source lines are 1-based
 end;
 
 end.

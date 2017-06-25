@@ -166,6 +166,10 @@ var
   ScanningLine: integer;
   ScanningFile: string;
 //Debugging...
+  MonitoringFile: string; //break when file+line reached
+  MonitoringLine: integer;
+  InMonitorFile: boolean; //if in MonitoringFile (reduce string comparisons)
+
   ScanningText:  string;   //the current source line
   ScanningNext: PChar;    //next text to scan
 
@@ -185,8 +189,14 @@ const
 implementation
 
 uses
-  SysUtils,
+  SysUtils, Windows, //DebugBreak
   uMacros, uDirectives, uParseC, uUI;
+
+procedure CheckMonitor;
+begin
+//called when input file changes
+  InMonitorFile := ScanningFile = MonitoringFile;
+end;
 
 (* SetTokenString - assign an short or long string.
 *)
@@ -946,6 +956,7 @@ begin
     ScanningLine := CurLine;
     //ScanningText := LineBuf; - not yet valid
     atBOL := True;
+    CheckMonitor; //debugging aid
   end;  //else not file based
   nextLine;
 end;
@@ -1303,6 +1314,11 @@ begin
       if (CurLine > 1) then
         OnLineChange(lcNewLine, self)
       //else OnLineChange(lcOpenFile, self);
+    end;
+  //debug
+    if InMonitorFile and (ScanningLine = MonitoringLine) then begin
+      //MonitorSet.edLineBuf.Text := LineBuf;
+      DebugBreak; //you wanted it
     end;
   end else
     self.pcN := PChar(empty);
@@ -1966,6 +1982,7 @@ begin
     ScanningFile := CurFile.src.name;
     ScanningLine := CurFile.CurLine;
     ScanningText := CurFile.LineBuf;
+    CheckMonitor;
     if fFileClosed and assigned(OnLineChange) then
       OnLineChange(lcResumeFile, CurFile);
   end else //remember last source file?
