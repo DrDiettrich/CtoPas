@@ -152,7 +152,7 @@ type
       stEnumMember,  //special scoping in C
   //parser created
     stVar,
-  {$IFDEF proto}
+  {$IFDEF __proto}
     stProto,
   {$ELSE}
   {$ENDIF}
@@ -179,7 +179,7 @@ const
     'e',  //stEnumMember,
   //parser created
     'v',  //stVar,
-  {$IFDEF proto}
+  {$IFDEF __proto}
     'o',  //stProto,
   {$ELSE}
   {$ENDIF}
@@ -196,7 +196,7 @@ const
     'const ', 'enum ',  //stConst, stEnumMember,  //const variable, enum member, #define???
   //parser created
     'var ',   //stVar,
-  {$IFDEF proto}
+  {$IFDEF __proto}
     'prototype ',
   {$ELSE}
   {$ENDIF}
@@ -255,7 +255,7 @@ type
 
   TSymConst = TSymVar;
   TSymEnum = TSymConst;
-{$IFDEF proto}
+{$IFDEF __proto}
   TSymProto = TSymbolC;  //eventually with virtual extensions for TSymProc?
 {$ELSE}
   TSymProto = TSymVar;  //really common ancestor?
@@ -314,7 +314,7 @@ other - local
     DefFile:  string;
     //OnProcRead: TOnProcRead;
     OnSymRead: TOnSymRead;
-  {$IFDEF PreInclude}
+  {$IFDEF __PreInclude}
     //DefPos: integer; - not for text files :-(
     procedure HandleDefFiles(f: TFile);
   {$ENDIF}
@@ -467,7 +467,7 @@ other - local
     procedure makeDim(const dim: string);
     procedure makePointer;
     function  qualify(t: eKey; fSpec: boolean): boolean; //const or volatile
-  {$IFDEF lclScopes}
+  {$IFDEF __lclScopes}
   //add to LclScope
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
@@ -724,7 +724,7 @@ I __inline
 *)
 procedure InitAlias;
 begin
-{$IFDEF PreInclude}
+{$IFDEF __PreInclude}
 //include handler
   uFiles.PreInclude := AllTypes.HandleDefFiles;
 {$ENDIF}
@@ -784,7 +784,7 @@ const
     TSymEnum,  //stEnumMember,  //const variable, enum member, #define???
     //stField,  //local in scope (proc, struct...)
     TSymVar,  //stVar,
-  {$IFDEF proto}
+  {$IFDEF __proto}
     TSymProto,
   {$ELSE}
   {$ENDIF}
@@ -930,7 +930,7 @@ begin
 end;
 
 
-{$IFDEF PreInclude}
+{$IFDEF __PreInclude}
 
 (* HandleDefFiles - process definition files
 *)
@@ -1616,7 +1616,7 @@ end;
 
 function TTypeDefs.defProc(const AName, ADef: string): TSymProto;
 begin
-{$IFDEF proto}
+{$IFDEF __proto}
 //here: prototype
   Result := defSym(stProto, AName, ADef) as TSymProto;
 {$ELSE}
@@ -1982,7 +1982,7 @@ begin
     if (scope = Globals) and (Statics <> nil) then
       scope := Statics;  //what if nil? (header translation???)
   Ktypedef:
-  {$IFDEF delayTags}
+  {$IFDEF __delayTags}
     begin //try substitute synthetic name of basetype
       //expect: spec=t{mbrs}, or t:name{mbrs} was already created!
       if basetype = nil then begin
@@ -2068,7 +2068,7 @@ But also should distinguish procedures from procedure pointers!
 Since calling conventions can be overridden in VC, they are finished here!
 __inline can be combined with other calling conventions!
 *)
-{$IFDEF lclScopes}
+{$IFDEF __lclScopes}
 //procedure RType.makeParams;
 procedure RType.makeParams(const params: string);
 var
@@ -2227,7 +2227,7 @@ begin
   end;
 end;
 
-{$ELSE} //no lclScopes
+{$ELSE} //no __lclScopes
 procedure RType.makeParams(const params: string);
 begin
   post := post + '(' + params + ')';
@@ -2358,7 +2358,7 @@ begin
     Result := Result + ' = ' + StrVal;
 end;
 
-{$IFDEF ParseTree}
+{$IFDEF __ParseTree}
 function TSymbolC.GetTokens: TTokenArray;
 begin
   Result := Definition;

@@ -75,7 +75,7 @@ eScanMode specifies special actions:
     The scanner returns t_rem or t_empty, stops at EOL
 *)
 
-{$IFDEF Filter}
+{$IFDEF __Filter}
   eScanMode = (
     //smCSource,  //default, C source files
     smStd,      //default language
@@ -638,7 +638,7 @@ unary_operator unary_expression
         GTOK();
         Result  := unary_expression ;
       end;
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opSub0:  begin //-
 {$ELSE}
     opSub_:  begin //-
@@ -683,7 +683,7 @@ unary_expression
     Result  := unary_expression ;
     WHILE True do begin
       case i_TTYP of
-{$IFDEF opMul}
+{$IFDEF __opMul}
       opStar0: // '*'
 {$ELSE}
       opStar_: // '*'
@@ -727,7 +727,7 @@ multiplicative_expression {("+" | "-") multiplicative_expression}
           GTOK();
           inc(Result, multiplicative_expression);
         end;
-{$IFDEF opMul}
+{$IFDEF __opMul}
       opSub0:  //'-'
 {$ELSE}
       opSub_:  //'-'
@@ -833,7 +833,7 @@ equality_expression {"&" equality_expression}
   function AND_expression: integer; // &
   begin
     Result  := equality_expression ;
-{$IFDEF opMul}
+{$IFDEF __opMul}
     WHILE i_TTYP  = opAmpersAnd  do begin
 {$ELSE}
     WHILE i_TTYP  = binAnd_  do begin
@@ -1756,7 +1756,7 @@ begin
         else  Result := opSharp; //always valid
         end;
       '%':  mkOp(opMOD);
-{$IFDEF opMul}
+{$IFDEF __opMul}
       '&':  mkOp(opAmpersAnd);
 {$ELSE}
       '&':  mkOp(binAnd_);
@@ -1764,7 +1764,7 @@ begin
       '''': if Mode = smMeta then scanDelimited('''', t_car) else _scanString(t_car);
       '(':  Result := opLPar;
       ')':  Result := opRPar;
-{$IFDEF opMul}
+{$IFDEF __opMul}
       '*':  mkOp(opStar0);
 {$ELSE}
       '*':  mkOp(opStar_);
@@ -1775,7 +1775,7 @@ begin
         if pc^ = '>' then
           mkOp2(opTo)
         else
-{$IFDEF opMul}
+{$IFDEF __opMul}
           mkOp(opSub0);
 {$ELSE}
           mkOp(opSub_);

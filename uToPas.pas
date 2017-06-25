@@ -203,9 +203,6 @@ const
     (n:''; t:poErr), //t_err,
     (n:''; t:poStr; p:prUnary), //t_str, //string literal "s", L"s", header name, + ID
     (n:''; t:poStr; p:prUnary), //t_car, //char 'c', L'c', + chars/cval
-{$IFDEF t_num}
-    (n:''; t:poErr), //t_num,  //unclassified preprocessor number (not yet implemented)
-{$ENDIF}
     (n:''; t:poInt; p:prUnary), //t_int,
     (n:''; t:poInt; p:prUnary), //t_Lint, //int number, + value
     (n:''; t:poLit; p:prUnary), //t_flt, //real number, + value
@@ -251,7 +248,7 @@ const
     (n:' mul'; t:poFunc), //*= letMUL,
 //!!! we don't have disambiguated tokens here!!!
 //unless the writer emitted special codes...
-{$IFDEF opMul}
+{$IFDEF __opMul}
   // *
     (n:'*'; t:poInfix; p:prMulOp), //opMul,
     (n:'^'; t:poPrefix; p:prUnary), //opPtr, //classified "*"

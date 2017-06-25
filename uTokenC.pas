@@ -42,9 +42,6 @@ type
     t_err,
     t_str, //string literal "s", L"s", header name, + ID
     t_car, //char 'c', L'c', + chars/cval
-{$IFDEF t_num}
-    t_num,  //unclassified preprocessor number (not yet implemented)
-{$ENDIF}
     t_int, t_Lint, //int number, + value
     t_flt, //real number, + value
     t_sym, t_symNX,  //symbol, + ID
@@ -56,7 +53,7 @@ type
     op2Sharp, nop2Sharp, //in/out of macro body
     opSharpAt, //MSC specific!
   //operators - sorted within lines
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &
 {$ELSE}
     binAnd_, letAND, logAND, // & &= &&, ambiguous: &
@@ -68,7 +65,7 @@ type
 
     logNOT, opNE,   // ! !=
     opMOD, letMOD,  // % %=
-{$IFnDEF opMul}
+{$IFnDEF __opMul}
     opStar_, letMUL, // * *=, ambiguous: *
 {$ELSE}
     opStar0, letMUL, // * *=, ambiguous: *
@@ -89,7 +86,7 @@ type
   //not in op1$
     opDot, op3Dot, // . ..., C++: .*
     opDiv, letDiv, OpDivDiv, // / /= //     {RP}
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opSub0, letSub, opDec, opTo, // - -= -- ->, C++: ->*
 {$ELSE}
     opSub_, letSub, opDec, opTo, // - -= -- ->, C++: ->*
@@ -158,7 +155,7 @@ type
   //eLangKeys = Kauto..Kpascal;
   //eLangKeys = Kauto..Kfastcall;
   eLangKeys = Ksizeof..Kstdcall;
-{$IFDEF extStorage}
+{$IFDEF __extStorage}
   eStorageClass = Kauto..Kunion;
 {$ELSE}
   eStorageClass = Kauto..Ktypedef;
@@ -197,7 +194,7 @@ const //meta convention(s)
   opPostDec = opDec;  //PreDec = letSub;
 
 const
-{$IFDEF opMul}
+{$IFDEF __opMul}
   cast_modifierS = [ opStar0, opPtr1, opAddr1 ];
 {$ELSE}
   cast_modifierS = [ opStar_ ];
@@ -213,7 +210,7 @@ const
   WhiteTokensPrep = [t_empty, t_NoEol, t_rem]; //not EOF, not t_bol
   WhiteTokens = WhiteTokensPrep + [t_bol];
 {$IFDEF old}
- {$IFDEF opMul}
+ {$IFDEF __opMul}
    ConstTokens = [t_empty..t_NoEol, opAmpersAnd..MaxTokenKind];
  {$ELSE}
    ConstTokens = [t_empty..t_NoEol, binAnd..MaxTokenKind];
@@ -223,7 +220,7 @@ const
 {$ENDIF}
 
 //allow for duplicate op (& -> && etc.)
-{$IFDEF opMul}
+{$IFDEF __opMul}
   DupOps = [opAmpersAnd, opAdd, opSub0, opLT, opGT, binOR];
 {$ELSE}
   DupOps = [binAnd, opAdd, opSub, opLT, opGT, binOR];
@@ -231,7 +228,7 @@ const
   //C++: "::"?
 //also allow for assignment (& -> &= etc.)
   LetOps = [
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opAmpersAnd, opADD,
     opSub0, //special handling for "->"
 {$ELSE}
@@ -243,7 +240,7 @@ const
     logNOT,
     opMOD,
     opDiv, //special handling for "//" and "/*"
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opStar0,
 {$ELSE}
     opStar_,
@@ -261,9 +258,6 @@ const
     '<error>',
     '<string>', //'<Lstring>',
     '<char>', //'<Lchar>',
-{$IFDEF t_num}
-    '<num>',
-{$ENDIF}
     '<int>', '<int64>',
     '<flt>',
     '<sym>', '<Csym>',  //symbols
@@ -283,7 +277,7 @@ const
     '!', '!=',
     '%', '%=',
     '*', '*=',
-{$IFDEF opMul}
+{$IFDEF __opMul}
   //replacements
   //unless better encoding: post-processor must count number of operands!
   //enclose binary operators in " "

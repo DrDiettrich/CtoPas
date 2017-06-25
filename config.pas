@@ -54,7 +54,7 @@ ON
   Untagged structures are unnamed until really required.
   The first following typename will become the struct name.
 *)
-{$DEFINE delayTags}
+{$DEFINE __delayTags}
 
 (* extStorage - use extended storage specifiers?
 Introduced 05-2006
@@ -62,7 +62,7 @@ Introduced 05-2006
   extStorage includes inline and struct/union/enum in the allowed storage class.
   Must propagate into proc def - no sym if no scope given!
 *)
-{.$DEFINE extStorage}
+{.$DEFINE __extStorage}
 
 (* ExprTerm - are expressions terminated, or separated?
 Introduced 05-2006.
@@ -70,15 +70,16 @@ Introduced 05-2006.
   and expressions have been terminated by ";".
   In new style list items are terminated by ";",
   and expressions are separated by "," (more C-style)
+NO MORE USED!
+{.$DEFINE __ExprTerm}
 *)
-{.$DEFINE ExprTerm}
 
 (* Filter - use common filter function for tokens.
 Introduced 07-2004.
   nextToken() and nextRaw() functions with mode and filter arguments.
   Common filter function replaces nextNoEof, nextNoWhite etc.
 *)
-{$DEFINE Filter}
+{$DEFINE __Filter}
 
 (* lclScopes - create and use local scopes
 Introduced 05-2006
@@ -92,20 +93,21 @@ static procedure definitions go into the Statics scope,
 non-static procedures are copies of (or references to) global prototypes,
   owned by the Globals scope.
 *)
-{$DEFINE lclScopes}
+{$DEFINE __lclScopes}
 
 (* oneSTB - scopes have a single symbol table
 Removed 05-2006 - furthermore only support (the new) single lists.
 Introduced 05-2006
   A single symbol table allows to list all symbols in declaration order.
-*)
+NO MORE USED
 //{$DEFINE oneSTB}
+*)
 
 (* opMul - alternate interpretation of ambiguous C operators.
   Define additional unary operators for "*" (^), "&" (@), "+", "-".
   Currently not used, perhaps in the cross compiler?
 *)
-{$DEFINE opMul}
+{$DEFINE __opMul}
 
 
 (* ParseTree - parse expressions etc. into trees?
@@ -115,12 +117,12 @@ Introduced 05-2006
 Procedure implementations deserve further considerations.
 Blocks can be implemented as real trees, at least for use as nested scopes.
 *)
-{ $DEFINE ParseTree}
+{ $DEFINE __ParseTree}
 
 (* PreInclude - process *.defs files?
   Currently not enabled, conflicts with fAutoConst
 *)
-{ $DEFINE PreInclude}
+{ $DEFINE __PreInclude}
 
 (* proto - separate prototypes from procedure-definitions
 Introduced 05-2006
@@ -135,11 +137,11 @@ OFF (bug: error saving symbols!!!)
     Modules never must be destroyed, can only be cleared if required.
   Procedures have a definition member with additional scopes etc.
 *)
-{.$DEFINE proto}
+{.$DEFINE __proto}
 
 (* t_num - strict handling of preprocessor numbers.
   I couldn't find any use for that funny number definition.
 *)
-{$UNDEF t_num}
+{$UNDEF __t_num}
 
 

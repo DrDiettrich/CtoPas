@@ -62,7 +62,7 @@ implementation
 
 uses
   SysUtils,
-  //uExprC, - if ParseTree?
+  //uExprC, - if __ParseTree?
   uFiles, uMacros,
   uScanC, uUI;
 
@@ -89,7 +89,7 @@ type
     r:  RType;
     fOldParams: boolean;  //prevent default type "int"
     //procedure Init;
-  {$IFDEF lclScopes}
+  {$IFDEF __lclScopes}
     constructor Create(AScope: TScopeC);
     procedure Clear;
   {$ELSE}
@@ -342,7 +342,7 @@ postfix_expression
         nextToken;
         Result  := cast_expression; //unary_expression;
       end;
-{$IFDEF opMul}
+{$IFDEF __opMul}
     opSub0,  //- here: unary!
     opMinus1:
       begin
@@ -453,7 +453,7 @@ type
     prHighest
   );
 
-{$IFDEF opMul}
+{$IFDEF __opMul}
   binops = opAmpersAnd..opTo;
 {$ELSE}
   binops = binAnd_..opTo;
@@ -464,7 +464,7 @@ const
   prPost = prErr;  //here: error! (postfix_expression)
     //should have been handled in cast->unary!
 
-{$IFDEF opMul}
+{$IFDEF __opMul}
   binopsS = [opAmpersAnd..opTo];
 {$ELSE}
   binopsS = [binAnd_..opTo];
@@ -472,7 +472,7 @@ const
 
   Prio: array[binops] of ePrio = (
   //operators - sorted within lines
-{$IFDEF opMul}
+{$IFDEF __opMul}
     prBinAnd, prLet, prLogAnd,  //opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &
 {$ELSE}
     prBinAnd, prLet, prLogAnd,  //binAnd_, letAND, logAND, // & &= &&, ambiguous: &
@@ -484,7 +484,7 @@ const
 
     prErr, prEq, //logNOT, opNE,   // ! !=
     prMul, prLet, //opMOD, letMOD,  // % %=
-{$IFnDEF opMul}
+{$IFnDEF __opMul}
     prMul, prLet, //opStar_, letMUL, // * *=, ambiguous: *
 {$ELSE}
     prMul, prLet, //opStar0, letMUL, // * *=, ambiguous: *
@@ -505,7 +505,7 @@ const
   //not in op1$
     prPost, prErr, //opDot, op3Dot, // . ..., C++: .*
     prMul, prLet, prErr, //opDiv, letDiv, OpDivDiv, // / /= //     {RP}
-{$IFDEF opMul}
+{$IFDEF __opMul}
     prAdd, prLet, prPost, prPost //opSub0, letSub, opDec, opTo, // - -= -- ->, C++: ->*
 {$ELSE}
     prAdd, prLet, prPost, prPost //opSub_, letSub, opDec, opTo, // - -= -- ->, C++: ->*
@@ -983,7 +983,7 @@ var
     if i_ttyp = Kinline then begin
     //special case
       r._inline := True;
-    {$IFDEF proto}
+    {$IFDEF __proto}
       r.symkind := stInline;  //??? - reserved for macros?
     {$ELSE}
     {$ENDIF}
@@ -1028,7 +1028,7 @@ var
       r.setNameSym;
     {$ENDIF}
       Result := nextToken <> opBeg;  //done?
-  {$IFDEF delayTags}
+  {$IFDEF __delayTags}
     //nothing to create for untagged type
   {$ELSE}
     end else if r.storage = KTypedef then begin
@@ -1223,7 +1223,7 @@ function TDeclaration.init_declarator_list: boolean;
       LogBug('no var/const to initialize');
       exit;
     end;
-{$IFDEF ParseTree}
+{$IFDEF __ParseTree}
     declSym.Definition := TDefinition.Create;
 {$ENDIF}
     r.declSym.StrVal := '<todo: parse expression>';
@@ -1392,7 +1392,7 @@ MS extension: qualifiers!!!
   pr.Create(r.mbrScope);  //if exists?
   startDecl; //!!! non-reentrant !!!
   while i_ttyp in declarator_qualifierS do begin
-{$IFDEF opMul}
+{$IFDEF __opMul}
     if i_ttyp in [opStar0, opPtr1] then begin
 {$ELSE}
     if i_ttyp = opStar_ then begin
@@ -1467,7 +1467,7 @@ MS extension: qualifiers!!!
     end else begin  // "("
     //procedure
       Result := parameter_list; //start with LPar
-    {$IFDEF proto}
+    {$IFDEF __proto}
       if i_ttyp = opBeg then
         r.symkind := stProc
       else
@@ -1482,7 +1482,7 @@ MS extension: qualifiers!!!
 end;
 
 function TDeclaration.recordExpr: boolean;
-{$IFNDEF ParseTree}
+{$IFNDEF __ParseTree}
 begin
 { TODO : try: don't terminate expression string - at least here! }
   r.declSym.StrVal := cond_expression; //(False);
@@ -1535,7 +1535,7 @@ end;
 
 
 function TDeclaration.recordBlock: boolean;
-{$IFNDEF ParseTree}
+{$IFNDEF __ParseTree}
 begin
 //start with "{"
   //r.declSym ???
