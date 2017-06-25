@@ -118,7 +118,7 @@ type
   //type modifiers (signedness) "-", "+"
     Ksigned, Kunsigned,
   //cv-qualifiers  "#", "V"
-    Kconst, Kvolatile,
+    Kconst, Krestrict, Kvolatile, //_Atomic,
   //Windows relevant! "C", "F", "" + "I"=inline
     Kcdecl, Kfastcall, Kstdcall
 (*
@@ -175,8 +175,8 @@ const //for the parser!
 
   calling_conventionS = [Kcdecl..Kstdcall];
     //Kcdecl, Kfastcall, Kinline, Kstdcall
-  cv_qualifierS = [Kconst, Kvolatile];
-    //Kconst, Kvolatile,
+  cv_qualifierS = [Kconst .. Kvolatile];
+    //Kconst, KRestrict, Kvolatile,
   type_qualifierS = cv_qualifierS + calling_conventionS;  // [Kconst..Kstdcall];
 
   type_modifierS = [Klong, Kshort, Ksigned, Kunsigned];
@@ -338,7 +338,7 @@ const
   //type modifiers (signedness)
     'signed', 'unsigned',
   //cv-qualifiers
-    'const', 'volatile',
+    'const', 'restrict', 'volatile',
   //Windows relevant!
     '__cdecl', '__fastcall', '__stdcall'
 (*

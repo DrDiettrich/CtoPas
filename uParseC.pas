@@ -149,6 +149,30 @@ function  cond_expression: string;
 (*
 type_name :
 specifier_qualifier_list [abstract_declarator]
+
+specifier-qualifier-list:
+               type-specifier specifier-qualifier-listopt
+               type-qualifier specifier-qualifier-listopt
+
+type-qualifier:
+                    const
+                    restrict
+                    volatile
+                    _Atomic
+abstract-declarator:
+                    pointer
+                    pointeropt direct-abstract-declarator
+direct-abstract-declarator:
+                     ( abstract-declarator )
+                     direct-abstract-declaratoropt [ type-qualifier-listopt
+                                    assignment-expressionopt ]
+                     direct-abstract-declaratoropt [ static type-qualifier-listopt
+                                    assignment-expression ]
+                     direct-abstract-declaratoropt [ type-qualifier-list static
+                                    assignment-expression ]
+                     direct-abstract-declaratoropt [ * ]
+                     direct-abstract-declaratoropt ( parameter-type-listopt )
+
 *)
   function  type_name: string;
   var
@@ -370,11 +394,11 @@ unary_expression
 *)
   function  cast_expression: string;
   const
-    cast_specifierS = type_modifierS + simple_type_specifiers
+    cast_specifierS = type_qualifierS + type_modifierS + simple_type_specifiers
       + complex_type_specifierS + cast_modifierS;
   begin
     if skip(opLPar) then begin
-    //typename from typedef, or simple, or "*"
+    //type-name from typedef, or simple, or "*"
       //if True then begin
       if ((i_ttyp = t_sym) and (Globals.isType(ScanText) >= 0))
       or (i_ttyp in cast_specifierS) then begin
@@ -900,13 +924,20 @@ begin
 {external_declaration}
 *)
   decl.Create(Globals); //only "static" is not exported!
+  Result := true; //if empty
   repeat   //while external_declaration do ;
-    if i_ttyp = opBeg then begin //not expected at global scope!
-    //todo: catch compound statement in proc definition
-      Result := skipBlock;
-      skip(opSemi); //what's this? should be catched
-    end else
+    case i_ttyp of
+    opSemi: //some macros expand into empty declarations
+      nextToken; //ignore
+    opBeg:  //not expected at global scope!
+      begin
+      //todo: catch compound statement in proc definition
+        Result := skipBlock;
+        skip(opSemi); //what's this? should be catched
+      end;
+    else //case
       Result := decl.declaration; //(extern)
+    end;
   until not Result or (i_ttyp = t_eof);
   decl.Done;
 end;

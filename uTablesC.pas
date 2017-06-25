@@ -1919,12 +1919,14 @@ begin
     include(attrs, t);
     case t of
     Kconst:     spec := '#' + spec;
+    KRestrict:  spec := 'R' + spec;
     Kvolatile:  spec := 'V' + spec;
     end;
   end else begin
     //include(declattrs, t);  //not correct, as long as only 1 set of attrs
     case t of
-    Kconst: pre := '#' + pre;
+    Kconst:    pre := '#' + pre;
+    KRestrict: pre := 'R' + pre;
     Kvolatile: pre := 'V' + pre;
     else  //what other qualifiers can occur?
       Log('unexpected declarator qualifier', lkTodo);

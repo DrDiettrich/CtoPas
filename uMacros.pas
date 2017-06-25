@@ -341,9 +341,8 @@ begin
 //reuse existing (predefined) macro?
   TObject(Result) := sym.GetMacro;
   if (Result = nil) or not (Result is TMacro) then
-    Result := self.CreateIn(parent, ScanText)  //, False);
-  else if Result is TMacroLibs then
-    ; //beep; //debug: expect predefined macro
+    Result := self.CreateIn(parent, ScanText);  //, False);
+  //else if Result is TMacroLibs then //beep; //debug: expect predefined macro
 {$IFDEF Origin}
 //remember origin? v2004+
   Result.OrgName := ScanningFile; // pFile.src.name;
