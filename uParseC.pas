@@ -739,7 +739,6 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
     //this one looks okay, consume '}'
       Result := skipTo(opEnd); //skipBlock();
       nextToken; //consume '}'
-      stmt := stmt + ListTerm; //meta!
       exit; //past '}', no ; follows
     end;
   //ordinary stmt, but may NOT be followed by ';' in { __asm ... }

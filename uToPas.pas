@@ -529,6 +529,9 @@ function  TToPas.nextToken: eToken;
 var  i: integer;
 begin
   Result := Scanner.nextRaw;  //no preprocessing...
+(* problem: ScanText only set at t_sym and a few others, not always!?
+*)
+  ScanText := TokenText(ScanToken); //helps?
 //map symbols??? at least C keys
   if (Result = t_sym) then begin
     if (ScanSym.mackind = skCKey) then
@@ -1994,6 +1997,8 @@ var //reduce try/finally blocks
   var
     stype:  eToken;
   begin
+(* problem? ScanText only set at t_sym and a few others, not always!?
+*)
   //problem: sym etc. -> expression!
     stype := i_ttyp;
     if stype < Kbreak then begin
@@ -2027,7 +2032,7 @@ var //reduce try/finally blocks
       end;
       FlushStmt(True);
     end else begin
-      skey := ScanText;
+      skey := ScanText; //ScanText is bogus??? all "endif"! ???
       nextToken;  //skip key
       skip(opLPar); //usually "("args);
       case stype of
