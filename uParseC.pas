@@ -572,8 +572,11 @@ expression : assignment_expression { "," assignment_expression }
 function  expression: string;
 begin
   Result := assignment_expression;
+(* macros can evaluate into empty expressions.
+  Should be catched before trying expression()?
+*)
   if Result = '' then
-    Result := '???';  //or exit?
+    exit; //Result := '???';  //or exit?
   while {fList and} skip(opComma) do begin
     //flag: multiple expressions?
     Result := addArg(Result, assignment_expression);
@@ -712,6 +715,11 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
       case i_ttyp of
       t_eof, opEnd:
         break;
+    {$IFDEF new}
+      opSemi: //empty statement - maybe significant after if(), while()?
+        nextToken;
+    {$ELSE}
+    {$ENDIF}
       else
         Result := statement(inner, stmt);
         inner.addStmt(stmt);  //clear stmt
@@ -885,6 +893,8 @@ begin //statement
     begin
       exit; //no stmt, terminate compound (should never occur!)
     end;
+  opSemi: //empty statement
+    tempstr := ''; //ignore, but count as stmt. also ignore TempStr=';'
   else
     tempstr := expression;
     if skip(opColon) then begin

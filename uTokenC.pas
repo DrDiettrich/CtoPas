@@ -121,7 +121,6 @@ type
     Kcdecl, Kfastcall, Kstdcall
 (*
   //extensions: Microsoft/Windows
-    K__asm,
     K__based,
     K__cdecl,
     K__declspec,

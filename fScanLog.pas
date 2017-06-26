@@ -172,6 +172,9 @@ type
 
 { TFilePos }
 
+const
+  MonitorFile = 'Monitor.txt';
+
 constructor TFilePos.Create(AFile: TFile; ALine: integer);
 begin
   loc.id := AFile.id;
@@ -216,6 +219,8 @@ begin
 end;
 
 procedure TScanLog.FormCreate(Sender: TObject);
+var
+  lst: TStringList;
 begin
   Application.ProcessMessages;
   uUI.LogLink := self.LogMsg;
@@ -223,6 +228,33 @@ begin
   Links := TObjectList.Create(True); //contains TFilePos
   //iLink := -1;  //current link: stack empty
   Painter := TSyntaxPainter.CreateFor(self.lbSrc, self.StatusBar);
+//restore the last Monitor file/line
+  if FileExists(MonitorFile) then begin
+    lst := TStringList.Create;
+    lst.LoadFromFile(MonitorFile);
+    if lst.Count > 1 then begin
+      //lst.CommaText := lst[0]; //split file,line
+      MonitoringFile := lst[0];
+      MonitoringLine := StrToInt(lst[1]);
+    end;
+    lst.Free;
+  end;
+end;
+
+procedure TScanLog.lbSrcContextPopup(Sender: TObject; MousePos: TPoint;
+  var Handled: Boolean);
+var
+  lst: TStringList;
+begin
+//try set monitor location
+  MonitoringFile := self.CurFile.name;
+  MonitoringLine := lbSrc.ItemIndex + 1; //source lines are 1-based
+//save the current monitor, for use on next program start
+  lst := TStringList.Create;
+  lst.Add(MonitoringFile);
+  lst.Add(IntToStr(MonitoringLine));
+  lst.SaveToFile(MonitorFile);
+  lst.Free;
 end;
 
 procedure TScanLog.Exit1Click(Sender: TObject);
@@ -1009,14 +1041,6 @@ end;
 procedure TScanLog.N2Click(Sender: TObject);
 begin
   MacroChecker.Init;
-end;
-
-procedure TScanLog.lbSrcContextPopup(Sender: TObject; MousePos: TPoint;
-  var Handled: Boolean);
-begin
-//try set monitor location
-  MonitoringFile := self.CurFile.name;
-  MonitoringLine := lbSrc.ItemIndex + 1; //source lines are 1-based
 end;
 
 end.

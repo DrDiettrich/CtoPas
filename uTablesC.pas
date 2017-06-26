@@ -464,7 +464,7 @@ other - local
     procedure makePointer;
     function  qualify(t: eKey; fSpec: boolean): boolean; //const or volatile
   {$IF __lclScopes}
-  //add to LclScope
+  //add to mbrScope
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
     function  makeStructMember(const t: RType): TSymbolC;
