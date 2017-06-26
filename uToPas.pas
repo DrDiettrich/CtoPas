@@ -140,6 +140,8 @@ uses
 *)
 var //external __lib;
   LibRef: string = '__lib'; //dummy lib name
+const
+  UnknownLib = 'unknown';
 
 type
   ePasOp = (
@@ -782,12 +784,12 @@ begin //ExpressionString
       expect(t_sym, 'no typename');
       expect(opComma, 'no arg","');
     //hint: typecast
-      Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
+      //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
+      Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
       expect(opRPar, 'no arg")"');
     end;
   else
     Result := TokenNames[i_ttyp];
-    //Log('unexpected op: ' + ScanText, lkBug);  //should never occur
     Log('unexpected op: ' + Result, lkBug);  //should never occur
     //Result := ''; //no valid expression?
   end;
@@ -1476,7 +1478,10 @@ begin
   end else begin
   //external reference, optional library and external name
     Write('external ');
-    Write(proc.LibName); //if library known, not linked by $L
+    if proc.LibName = '' then
+      Write(UnknownLib)  //proc.LibName := 'unknown';
+    else
+      Write(proc.LibName); //if library known, not linked by $L
   {
     if proc.ExtName <> '' then
       Write('name ');
@@ -1554,7 +1559,7 @@ begin
       ShowVarargs;
       inc(pc);
     end else if (StrLComp(pc, '"va_list"', 9) = 0) then begin
-    //what's this good for?
+    //what's this good for?  bug: means PVOID!
       ShowVarargs;
       inc(pc, 9);
     end else
@@ -2032,7 +2037,7 @@ var //reduce try/finally blocks
       end;
       FlushStmt(True);
     end else begin
-      skey := ScanText; //ScanText is bogus??? all "endif"! ???
+      skey := ScanText;
       nextToken;  //skip key
       skip(opLPar); //usually "("args);
       case stype of
@@ -2235,6 +2240,9 @@ const
   ...
 *)
   ConstSection;
+//add dummy/default library
+  WriteLn(UnknownLib + ' = ''unknown.dll'';');
+  WriteLn(LibRef + ' = ''' + LibName + ''';');
   for c := low(c) to high(c) do begin
     //only if macro used?
     WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
@@ -2393,7 +2401,7 @@ begin //WriteImpl
     else if sym.kind = stProc then
       WriteProcSym;
   end;
-//show macros
+//show macros - better before anything else?
 if ShowMacs then begin
   if Globals.DefFile <> '' then begin
   { TODO 1 : use new DefFile interface!!! }
