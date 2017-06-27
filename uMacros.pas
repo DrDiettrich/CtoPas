@@ -480,6 +480,10 @@ begin
       exit; //don't flag expanding
     end;
   end;
+(* Now the expanded token stream is available for further parsing.
+  Here is a chance to classifiy the macro without interfering
+  with source code parsing!
+*)
   Self.fExpanding := True; //reset when expansion finished
 end;
 

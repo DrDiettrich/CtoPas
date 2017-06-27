@@ -673,7 +673,7 @@ begin
 end;
 
 (* statement - return both a string and an error condition.
-  Append 1 stmt to s.
+  Append 1 stmt to stmt.
 *)
 function  statement(scope: TSymBlock; var stmt: string): boolean;
 
@@ -1690,6 +1690,13 @@ begin
   ParseCModule(fn, fStopOnError);
 end;
 
+(* Attempt to classify a macro.
+  Only the macro type (const...) and fully expanded Body string is returned.
+  The re-definition of the macro has to be constructed separately.
+  All macros, used during expansion, should be classified as well,
+    so that the final definition contains as many symbols as possible
+    (as few expansions as possible)
+*)
 //function  ParseMacro(mac: TSymMacro): boolean;
 function  ParseMacro(mac: TSymMacro; var s: string): eMacroCode;
 var
@@ -1724,7 +1731,7 @@ begin //ParseMacro
   init;
   if Result <> mcEmpty then begin
   //not empty, try expression
-    s := expression;
+    s := expression; //fully expanded result, not usable here?
     //Result := (s <> '') and (ParserFlags = []);
     if ParserFlags = [] then
       Result := mcExpr
@@ -1733,6 +1740,7 @@ begin //ParseMacro
     else if Result < mcExpr then begin
     //not expression, try statement
       init;
+    //should handle statement sequence!
       if statement(blk, s) then begin
         Result := mcStmt;
         if s <> '' then
@@ -1743,6 +1751,8 @@ begin //ParseMacro
     (mac as TMacro).expanding := False;
     blk.Free;
   end;
+//this is for a stand-alone invocation only!
+//otherwise the stack has to shrink up to our stream (by index?)
   while TokenStack.pop do
     ; //remove dangling files
 //reset parser mode
