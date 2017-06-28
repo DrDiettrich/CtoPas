@@ -733,8 +733,9 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
     //exit with s='}'
   end;
 
-  (* Various formats:
-    __asm ... ; <-- the only regular stmt format
+  (* MSC Various formats:
+    __asm is a statement separator!
+    __asm ... [";" | eol ] [__asm | "}"] //only ; and eol belong to the __asm stmt!
     __asm { ... }
     { __asm ... }
 
@@ -745,7 +746,7 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
   //optimized for speed, using raw tokens only!
     if nextToken = opBeg then begin
     //this one looks okay, consume '}'
-      Result := skipTo(opEnd); //skipBlock();
+      Result := skipTo(opEnd); //skipBlock();  !nesting allowed!
       nextToken; //consume '}'
       exit; //past '}', no ; follows
     end;
@@ -753,7 +754,8 @@ function  statement(scope: TSymBlock; var stmt: string): boolean;
     //skipTo(opSemi); //must stop ON ';', handled below!
     repeat
       i_ttyp := nextNoWhite;
-    until i_ttyp in [t_eof, opEnd, opSemi];
+    until i_ttyp in [t_eof, t_bol, opEnd, opSemi]; //, Kasm]; breaks also
+    skip(t_bol); //not part of asm or next stmt
   end;
 
 {
@@ -772,9 +774,10 @@ begin //statement
   case i_ttyp of
   Kasm:
     begin
+    //simplified output - how? __asm(...) only?
       stmt := stmt + tempstr + '(...)' + ListTerm;
       __asm;
-      skip(opSemi);
+      skip(opSemi); //may or may not be present
       exit;
     end;
   Kbreak,     //"break;"

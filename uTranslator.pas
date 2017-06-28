@@ -196,7 +196,8 @@ end;
 *)
 procedure TFileMeta.SetSource(const ASrc: string);
 begin
-  LineBuf := Asrc;
+  LineBuf := Asrc; //internal
+  ScanningText := ASrc; //global
   self.mode := smMeta;
   //Result := self.ScanPChar(PChar(Asrc));
   rewind;

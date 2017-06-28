@@ -1640,20 +1640,21 @@ var
     if fSkip then
       ScanToken.symID := -1  //flag no string
     else begin
-      try
+    //following Scan... mapping ALSO must be done in token streams!!!
+      try //bug seems to have been fixed
         ScanText := '';
         SetString(ScanText, pc1, pc - pc1);
         ScanToken.symID := mapSym(ScanText);
-        if self.src <> nil then begin //File scanner
-          r := Symbols.getSymbol(ScanToken.symID);
-          if not r.loc.valid then begin
-          //only at first occurence!
-            r.loc.id := self.src.id; //src can be nil?
-            r.loc.line := self.CurLine;
-            ScanSym := r^;
-          end else begin
-          //actual occurence
-            ScanSym := r^;
+        r := Symbols.getSymbol(ScanToken.symID);
+        if not r.loc.valid and (self.src <> nil) then begin
+        //first occurence, initial location
+          r.loc.id := self.src.id; //src can be nil?
+          r.loc.line := self.CurLine;
+          ScanSym := r^; //as just updated
+        end else begin
+        //actual occurence, copy def and update loc of copy
+          ScanSym := r^;
+          if src <> nil then begin
             ScanSym.loc.id := self.src.id;
             ScanSym.loc.line := self.CurLine;
           end;

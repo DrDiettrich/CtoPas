@@ -532,6 +532,7 @@ var  i: integer;
 begin
   Result := Scanner.nextRaw;  //no preprocessing...
 (* problem: ScanText only set at t_sym and a few others, not always!?
+  ScanSym also invalid!
 *)
   ScanText := TokenText(ScanToken); //helps?
 //map symbols??? at least C keys
@@ -781,9 +782,10 @@ begin //ExpressionString
       //expect(opType, 'no type to cast');
       //WriteType;
       Result := ScanText;
-      expect(t_sym, 'no typename');
+    //correct so far, but token can be typename (t_sym) or built-in (Kint...)!
+      nextToken; //assume previous was a type name, somehow
+      //expect(t_sym, 'no typename');
       expect(opComma, 'no arg","');
-    //hint: typecast
       //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
       Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
       expect(opRPar, 'no arg")"');
@@ -1862,8 +1864,13 @@ const
         if i_ttyp <> t_eof then begin
           Log('too many stmts in line', lkBug);
           //ShowStmt;
-          WriteLn('??? ' + stmt + ' ...');
+          WriteLn('??? ''' + stmt + ' ...''');
           //break;  //prevent infinite loop, here
+        //debug <------------------
+          //rewind src, parse again
+          Scanner.SetSource(stmt);
+          nextToken;
+          ShowStmt;
         end;
       end;
       //opEnd already consumed!
@@ -2006,7 +2013,7 @@ var //reduce try/finally blocks
 *)
   //problem: sym etc. -> expression!
     stype := i_ttyp;
-    if stype < Kbreak then begin
+    if stype < Kasm then begin
     //expression, just at start
       case stype of
     //operators?
@@ -2042,6 +2049,14 @@ var //reduce try/finally blocks
       skip(opLPar); //usually "("args);
       case stype of
     //simple
+      Kasm: //__asm, right now: __asm(...);
+        begin //skip, was listed already?
+        //skip to )
+          Write(skey); //view at least this one!
+          while i_ttyp <> opRpar do
+            nextToken; //show it?
+          //) is skipped below
+        end;
       Kbreak, //? match meaning?
       Kcontinue:  //op;
         Write(skey);
@@ -2099,8 +2114,8 @@ var //reduce try/finally blocks
         end;
       //Kelse,
       Kreturn:  //return[(expr)];
-        begin
-          if i_ttyp <> opSemi then begin
+        begin //never called???
+          if i_ttyp <> opSemi then begin  //never true?
           //possible problem: now these are 2 statements! - may require begin...end
             Write('begin Result := ' + ExpressionString(t_empty) + '; exit; end');
           end else
