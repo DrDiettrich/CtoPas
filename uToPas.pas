@@ -783,8 +783,17 @@ begin //ExpressionString
       //WriteType;
       Result := ScanText;
     //correct so far, but token can be typename (t_sym) or built-in (Kint...)!
+    //todo: make common type handling routine, for use all over the translator!
       nextToken; //assume previous was a type name, somehow
       //expect(t_sym, 'no typename');
+      if skip(opColon) then begin //fake type-ref!!!
+        Result := Result + '_' + ScanText; //expected fake name
+      //make sure that the type has been defined?
+        if Globals.getType(Result) = nil then begin
+          beep; //debug, must have been defined!!!
+        end;
+        nextToken;
+      end;
       expect(opComma, 'no arg","');
       //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
       Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
@@ -879,7 +888,7 @@ var
     Write(n);
   end;
 
-begin
+begin //WriteArgumentList
   i := 0;
   fVarargs := False;
   while pc^ <> ')' do begin
@@ -989,7 +998,7 @@ begin
   'v':  WriteInc('pointer');
   'c':  WriteInc('PChar');
   '(':  WriteProcType; //procedural type is implicit pointer!
-  else  Write('^');
+  else  Write('^'); //not always syntactically valid Pascal!
   end;
 end;
 
@@ -1010,12 +1019,19 @@ end;
 procedure TToPas.WriteTypeRef;
 var
   s: string;
-begin //quoted typename - unquote
+  i: integer;
+begin //got quoted typename - unquote
   s := Unquoted(typeQuote);
+  i := Pos(':', s);
+{$IFDEF old}
   if (Length(s) > 2) and (s[2] = ':') then begin
-  //remove S/U/E from tagged ref
+  //remove S/U/E from tagged ref?
     s[2] := '_';
   end;
+{$ELSE}
+  if i > 0 then
+    s[i] := '_';
+{$ENDIF}
   Write(s);
 end;
 
@@ -1322,9 +1338,35 @@ begin
   end;
 end;
 
+(* Problem with ':' in tag refs!
+  Here: fake name with : replaced by _
+  Also: for tag ref: prefix by Ps_tag=*<fake>
+    Add ptr type to global definitions, if not found
+    Show always before struct def, even if already exists!
+    ?ALSO for untagged struct? (cannot contain self-ref!)
+*)
 procedure TToPas.WriteTypeSym;
 var
   s: string;
+
+  procedure WriteFake;
+  var
+    name: string;
+    sym: TTypeDef;
+  begin
+    name := 'P'+s;
+    sym := Globals.getType(name);
+    if sym = nil then begin
+      sym := Globals.defType(name,'',0); //should be acceptable
+    end;
+    if sym.Def = '' then begin //just created?
+      //sym.Def := '*'+s;
+      sym.Def := '*'+typeQuote +s+ typeQuote; //s quoted as type ref
+    end;
+    WriteLn(name + ' = ^' + s + ';' + ' //forward');
+    //todo: mark ptr-type shown
+  end;
+
 begin
   try
     typ := sym as TTypeDef;
@@ -1335,6 +1377,11 @@ begin
       if (Length(s) > 2) and (s[2] = ':') then begin
       //convert tag name reference "t:tag" -> "t_tag"
         s[2] := '_';
+        if (s[1]='S')
+        //or (s[1]='U') //also for union???
+        then
+          WriteFake; //show fake pointer before struct/union def
+      //now show the struct definition
         Write(s + ' = ');
         case s[1] of
         'E':  WriteEnum;
@@ -1344,7 +1391,7 @@ begin
         end;
       end else begin
         Write(s + ' = ');
-        WriteTypePc(inNone);
+        WriteTypePc(inNone); //type def, ^t valid (never convert!)
         if pc^ <> #0 then begin
         //not everything converted
           s := string(pc);
@@ -1395,7 +1442,7 @@ begin
       pc := ScanDef(sym.StrVal);  // PChar(sym.StrVal);
       WriteExprPc;
     end else
-      Write('0');  // sym.IntVal); //, ';');
+      Write('0{nil?}');  // sym.IntVal); //, ';');
     WriteLn(';');
   end;
 end;
@@ -1562,7 +1609,7 @@ begin
       ShowVarargs;
       inc(pc);
     end else if (StrLComp(pc, '"va_list"', 9) = 0) then begin
-    //what's this good for?  bug: means PVOID!
+    //variadic C function ('...') 
       ShowVarargs;
       inc(pc, 9);
     end else
@@ -1830,7 +1877,7 @@ const
   sfForNoSteps = sfForWithSteps;  // [{sfShowBegin,} sfIndent, sfShowEnd, sfAsBlock];
   sfIf = sfAlwaysBlock; // [sfShowBegin, sfIndent, sfShowEnd, sfAsBlock];
   sfSwitch = [{sfShowBegin,} sfIndent, sfShowEnd, sfAsBlock];
-  sfRepeat = [{sfShowBegin,} sfIndent{, sfShowEnd}{, sfAsBlock}];
+  sfRepeat = [{sfShowBegin,}{ sfIndent}{, sfShowEnd}{, sfAsBlock}];
   sfBlock = sfAlwaysBlock;  // [sfShowBegin, sfIndent, sfShowEnd, sfAsBlock];
 
 (* ShowStmts: show one or more statements, indented
@@ -1860,8 +1907,10 @@ const
   //now show stmt(s)
     if Result then begin
     //show block
+    //!!! continued line after opEnd possible !!!
       while getLine(True) and not skip(opEnd) do begin
         ShowStmt;
+if False then //old, not really a bug!?
         if i_ttyp <> t_eof then begin
           Log('too many stmts in line', lkBug);
           //ShowStmt;
@@ -1895,7 +1944,7 @@ const
       if (sfAsBlock in flags) then begin //begin shown
         Write('end'); //not in "for"
         //FlushStmt(False);
-      end;  // stmts may follow (in "for"!)
+      end;  // stmts may follow (in "for", "do"!)
     end;
   //always return past ";"
   end;
@@ -2086,8 +2135,13 @@ var //reduce try/finally blocks
         begin
           WriteLn('repeat');  //nextToken;
           inc(indent);
+        {$IFDEF old}
+        //set parser flags?
           ShowStmt; //works - "," instead of ";" ???
           //expect(opComma, 'no do","stmt');
+        {$ELSE}
+          ShowStmts(sfRepeat); //should suppress begin/end
+        {$ENDIF}
           dec(indent);
           Write('until not ');
           Write(ExpressionString(logNOT));

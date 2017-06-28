@@ -1846,6 +1846,9 @@ end;
 (* makeTagRef - remember basetype
   Format: <t> [":"<name>] [add later: "{"<def>"}"]
 Called from parser.handleTag
+
+Problem: syntax not usable in Pascal type refs (cast...),
+  must become proper type sym
 *)
 procedure RType.makeTagRef(sue: eKey; const tag: string);
 begin

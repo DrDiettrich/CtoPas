@@ -1121,7 +1121,7 @@ type_specifier [declarator] ":" constant_expression
           break;
         repeat  //struct_declarator
           mbr.declarator; //opt
-          if skip(opColon) then
+          if skip(opColon) then  //bitfield?
             mbr.r.Value := cond_expression;
           r.makeStructMember(mbr.r);
           if not skip(opComma) then
