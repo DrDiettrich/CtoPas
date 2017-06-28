@@ -132,6 +132,7 @@ Classify symbols:
     skMacro   //expand as macro
   );
 const
+//duplicate name!!!
   aSymbolKind: array[eSymbolKind] of char = (
     'S',  //?
     'K', //never streamed

@@ -1404,7 +1404,8 @@ end;
 procedure TToPas.VarSection;
 begin
   if curkind <> stVar then begin
-    WriteLn(' ');
+    if outbuf <> '' then //flush
+      WriteLn(' '); //todo: prevent empty line after proc header?
     Outdent('var');
     curkind := stVar;
   end;
@@ -1869,7 +1870,10 @@ const
         //debug <------------------
           //rewind src, parse again
           Scanner.SetSource(stmt);
-          nextToken;
+          nextToken; //debug break, process line again
+        //problem: structured stmts can contain block end }; + continued code in one line
+          if skip(opEnd) then
+            nextToken; //skip both }; of preceding block
           ShowStmt;
         end;
       end;
@@ -2160,6 +2164,9 @@ var //reduce try/finally blocks
 
 var
   i: integer;
+const
+  DBG1: boolean = False; //True;
+  DBG2: boolean = False; //True;
 begin //WriteProcBody
 (* Special handling required:
 Assume NO local procedures, i.e. indent is always 1.
@@ -2176,6 +2183,15 @@ First try:
   vars := TStringList.Create;
   stmts := TStringList.Create;
   try
+if DBG1 then begin //debug - contains two copies!!!
+(* ???
+  maybe first set as parsed, second one read from file???
+*)
+  WriteLn('(* Body lines');
+  for i := 0 to body.Count - 1 do
+    WriteLn(body.Strings[i]);
+  WriteLn('*)');
+end;
     stmts.Capacity := body.Count + 1;
     //stmts.Add('{'); //part of the Proc.Def! ???
     for i := 0 to body.Count - 1 do begin
@@ -2184,13 +2200,13 @@ First try:
       //case scanner.scanString(stmt) of
       case firstToken of
       Kauto, Kregister: //register not expected, but does no harm
-        if AddVar then
+        if AddVar then //adds to vars[]
           stmts.Add(stmt);  //var is initialized!
       Kextern:  //debug!
       {$IFDEF old}
         ; //ignore, for now. Lookup global sym? (simply use the name!)
       {$ELSE}
-        WriteLn('//' + stmt);
+        WriteLn('//extern???' + stmt);
       {$ENDIF}
       Kstatic:
         AddStatic;  //currently: as const -> not normally writeable...
@@ -2202,9 +2218,19 @@ First try:
         stmts.Add(stmt); //to be translated
       end;
     end;
+if DBG2 then begin //debug - everything added twice!
+  WriteLn('(* pre-parsed');
+  for i := 0 to vars.Count - 1 do
+    WriteLn(vars[i]);
+  WriteLn('//code');
+  for i := 0 to stmts.Count - 1 do
+    WriteLn(stmts[i]);
+  WriteLn('end pre *)');
+end;
   //show vars
     if vars.Count > 0 then begin
       //outdent('var');
+if DBG2 then  WriteLn('//vars: '+IntToStr(vars.Count));
       for i := 0 to vars.count - 1 do begin
         stmt := vars[i];
         case firstToken of
@@ -2222,6 +2248,8 @@ First try:
     end;
     ln := 0;
     indent := 0;
+if DBG2 then  WriteLn('//stmts: '+IntToStr(stmts.Count));
+
     while getLine(True) and ShowStmt do
       ;
     //expect(opEnd, 'no body"}"');  //really???

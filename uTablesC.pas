@@ -2276,7 +2276,7 @@ if False then //better, but should not be required any more
   end;
 (* static - storage duration or linkage?
   Here we only flag the existence of "static".
-  The applicable scope (linkage) if only affected by "extern".
+  The applicable scope (linkage) is only affected by "extern".
   Storage duration must be handled explicitly when required,
     based on the actual scope (if neither global nor module).
 *)

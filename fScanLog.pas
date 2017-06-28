@@ -421,6 +421,9 @@ begin
   TypeDefList.ShowTypes;
 end;
 
+(* This version is for loading everything from file!
+  No more applicable, file only contains procedures, no types etc.!
+*)
 procedure TScanLog.LoadTest1Click(Sender: TObject);
 var
   s: string;
@@ -434,8 +437,12 @@ begin
       exit;
   end;
   fLogProgress := True;
+{$IFDEF old}
   LogMsg('Convert ' + s, lkProgress);
   Globals.LoadFromFile(s);
+{$ELSE}
+  LogMsg('Translate...', lkProgress);
+{$ENDIF}
   uToPas.ToPas(MainFile);
   self.LogMsg('Conversion finished', lkProgress);
   Screen.Cursor := crDefault;
