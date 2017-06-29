@@ -1263,6 +1263,8 @@ begin //todo: make Object with access methods
   inc(pc);  //skip ">"
 end;
 
+(* Write Reference or Definition?
+*)
 procedure TToPas.WriteTypePc(fIn: eSU);
 begin
   while pc^ <> #0 do begin

@@ -232,7 +232,7 @@ type
     destructor  Destroy; override;
     function  SetID(nameID: integer): integer;
     function  toString: string; override;  //full (meta) string
-    function  MetaName: string;
+    function  MetaName: string; //name +$scopenum if scoped
     function  TypedName: string; virtual;  //-> name[:type]
     function  UniqueName: string; virtual;
   //reduce confusion
@@ -548,7 +548,9 @@ const
     ExpSep = ',';
   {$ENDIF}
 
-var
+var //currently unused
+(* intended usage: 'T' for Pascal UniqueName of typedef
+*)
   TypePrefix: string; //= 'T';
 
 implementation
@@ -1885,9 +1887,9 @@ end;
   Specifier attributes are added to .spec,
   declarator attributes are added to .pre.
 
-Calling conventions (and more?) can occur both inside an specifier
-  or an (possibly nested!) declarator.
-  At the end of an nested declarator all components must be copied
+Calling conventions (and more?) can occur both inside a specifier
+  or a (possibly nested!) declarator.
+  At the end of a nested declarator all components must be copied
   into the outer declaration, and processed there again. This means,
   in the case of calling conventions, that the spec string must be updated.
 It seems as if calling conventions can be overriden in VC.
@@ -1962,6 +1964,8 @@ var
   symkind: eSymType;
   scope:  TScope;
   typ:  TTypeDef;
+  id: integer;
+  ps: PSymPrep;
 begin
 (* What about parameters, SUE members...?
   We assume that we are called ONLY IF a symbol MUST be created!
@@ -1972,7 +1976,7 @@ begin
   C: only "static" is not exported!
 *)
   if (self.name = '') or (declSym <> nil) then
-    exit; //nothing to do
+    exit; //nothing to do?
   scope := declScope;
   case storage of
   Kextern:  scope := Globals; //never create in a local scope!
