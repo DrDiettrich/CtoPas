@@ -392,6 +392,7 @@ type
     procedure WriteInc(const s: string);
     procedure WriteName(d1, d2: char);
     function  Unquoted(delim: char): string;
+    function  TypeRefRequired: string;
   protected //type related, pc based parser!!!
     typeswritten: boolean;  //standard types
     procedure TypeSection;  //also write default types...
@@ -778,22 +779,7 @@ begin //ExpressionString
     begin
       nextToken;
       expect(opLPar, 'no argument list');  //skip "("
-    //handle type ref
-      //expect(opType, 'no type to cast');
-      //WriteType;
-      Result := ScanText;
-    //correct so far, but token can be typename (t_sym) or built-in (Kint...)!
-    //todo: make common type handling routine, for use all over the translator!
-      nextToken; //assume previous was a type name, somehow
-      //expect(t_sym, 'no typename');
-      if skip(opColon) then begin //fake type-ref!!!
-        Result := Result + '_' + ScanText; //expected fake name
-      //make sure that the type has been defined?
-        if Globals.getType(Result) = nil then begin
-          beep; //debug, must have been defined!!!
-        end;
-        nextToken;
-      end;
+      Result := TypeRefRequired; //at current scan position
       expect(opComma, 'no arg","');
       //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
       Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
@@ -1014,6 +1000,60 @@ begin
   until pc^ = delim;
   SetString(Result, pc0, pc - pc0);
   inc(pc);  //skip delim
+end;
+
+(* Must return a type name for a possibly complex reference.
+  Handle ':' in code, indicating unfinished type declaration.
+  Accept ['*']S:tagName (:num?)
+*)
+function TToPas.TypeRefRequired: string;
+var
+  id: integer;
+  sym: TSymType;
+  psym: PSymPrep;
+  def: string;
+begin
+//handle type ref
+  def := '???'; //error indicator
+  //expect(opType, 'no type to cast');
+  //WriteType;
+  if skip(opStar0) then begin
+    Result := TypeRefRequired; //creates type, if not alrady defined
+    assert(Result <> '', 'bad type ref');
+    def := '*'+Result; //for type def
+    Result := 'P' + Result;
+    //also must be/become typename
+  end else begin
+    Result := ScanText; //first token of this reference
+    def := Result; //cannot define 'sym = sym'!!!???
+  //correct so far, but token can be typename (t_sym) or built-in (Kint...)!
+    expect(t_sym, 'no typename'); //minimum: 'S' !!!invalidates ScanSym!!!
+    if skip(opColon) then begin //fake type-ref!!!
+      assert(Result = 'S', 'not struct tag ref');
+      def := Result + ':' + ScanText; //if symbol must be created
+      Result := Result + '_' + ScanText; //expected fake name
+      //now ScanSym=tagname!
+    end;
+    //must be/become typename
+  end;
+//make sure we got a symbol, should be a type sym
+  assert(i_ttyp=t_sym, 'no type sym'); //maybe num?
+  if ScanSym.mackind = skType then //ScanSym valid?
+    exit; //okay, is already a type
+//not yet as type
+  if ScanSym.mackind <> skSym then
+    Log('retype sym?', lkBug);
+  id := ScanToken.symID; //also update typeID!
+//make sure that the type has been defined?
+  if Globals.getType(Result) = nil then begin
+  //is not a defined type
+  //todo: define in uParseC, when reference occurs!
+    beep; //debug, must have been defined!!!
+  //def in recursive invocation??? basetype? (only AFTER sym creation!)
+    sym := Globals.defType(Result, def, id); //def=???
+  //all done?
+  end;
+  nextToken;
 end;
 
 procedure TToPas.WriteTypeRef;

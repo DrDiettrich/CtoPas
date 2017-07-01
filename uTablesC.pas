@@ -456,7 +456,7 @@ other - local
     declSym: TSymbolC;  //as soon as created
     procedure Init;   //~constructor, clear everything
     procedure Reset;  //init declarator, keep specification
-    procedure makeTagRef(sue: eKey; const tag: string);
+    procedure makeTagRef(sue: eKey; const tagname: string);
     procedure setNameSym; //from ScanSym
     procedure propagateName(const t: RType);
     procedure type_specifier(i_ttyp: eToken; fDefault: boolean);
@@ -911,6 +911,21 @@ begin
     Log('create dummy: ' +  AName, lkDebug);
   end;
   TSymbolC(Result) := defSym(stTypedef, AName, ADef);
+{$IF __delayTags}
+  //missing id is intentional - shall be set later!
+{$ELSE}
+  if (id = 0) then begin
+  //debug: ref to Symbols[]?
+  //intentional (created later?) or simply forgotten?
+    if (Pos(':', AName)>0) then begin
+      //become sym?
+    end else begin
+
+    end;
+  end else begin
+  //mark as typename?
+  end;
+{$IFEND}
   Result.SetID(id);
 end;
 
@@ -1852,7 +1867,7 @@ Called from parser.handleTag
 Problem: syntax not usable in Pascal type refs (cast...),
   must become proper type sym
 *)
-procedure RType.makeTagRef(sue: eKey; const tag: string);
+procedure RType.makeTagRef(sue: eKey; const tagname: string);
 begin
   self.specToken := sue;
   case sue of
@@ -1862,8 +1877,8 @@ begin
   else
     assert(False, 'bad basetype');
   end;
-  if tag <> '' then begin
-    spec := spec + ':' + tag;
+  if tagname <> '' then begin
+    spec := spec + ':' + tagname;
     basetype := Globals.defType(spec, '', nameID); //typename without quotes
     if not loc.valid then begin
     //default location?
@@ -1964,8 +1979,6 @@ var
   symkind: eSymType;
   scope:  TScope;
   typ:  TTypeDef;
-  id: integer;
-  ps: PSymPrep;
 begin
 (* What about parameters, SUE members...?
   We assume that we are called ONLY IF a symbol MUST be created!
@@ -1984,21 +1997,19 @@ begin
     if (scope = Globals) and (Statics <> nil) then
       scope := Statics;  //what if nil? (header translation???)
   Ktypedef:
-  {$IF __delayTags}
+  {$IF __delayTags} //means: assign next (typedef'd) name later
     begin //try substitute synthetic name of basetype
       //expect: spec=t{mbrs}, or t:name{mbrs} was already created!
       if basetype = nil then begin
         if (specToken in [Kenum, Kstruct, Kunion])
         and (spec[2] = '{') then begin
         //untagged struct
-          //if (pre = '') and (post = '') then begin
-          if True then begin  //always create t:name
-          //direct reference to struct - use as tagname
+          if (pre = '') and (post = '') then begin
+          //if True ???
             typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
             typ.loc := self.loc;
             basetype := typ;
             spec := quoteType(basetype.name);
-            //basetype.symID? - stay zero?
           //finish enums? - problem: mbrScope cleared before decl spec!
             if spectoken = Kenum then begin
               finishEnum;
@@ -2327,6 +2338,7 @@ begin
   Result := GetName;
   if Result[2] = ':' then begin
   //anonymous SUE type? or what?
+  //try tag ref, found how?
     Result := QuoteType(Result);
   end;
 end;
