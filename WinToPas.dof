@@ -100,7 +100,7 @@ Conditionals=
 DebugSourceDirs=
 UsePackages=0
 [Parameters]
-RunParams=
+RunParams=test1.c
 HostApplication=
 Launcher=
 UseLauncher=0

@@ -228,6 +228,9 @@ begin
   Links := TObjectList.Create(True); //contains TFilePos
   //iLink := -1;  //current link: stack empty
   Painter := TSyntaxPainter.CreateFor(self.lbSrc, self.StatusBar);
+//file option?
+  if ParamCount >= 1 then
+    edFile.Text := ParamStr(1);
 //restore the last Monitor file/line
   if FileExists(MonitorFile) then begin
     lst := TStringList.Create;
