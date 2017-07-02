@@ -224,8 +224,8 @@ type
       //intended purpose: substitution of conflicting names
     ScopeNum:   byte;  //byte should be sufficient?
     //name: string; //? for independence from owner list?
-    Def:  string;
-    BaseType: TTypeDef; //TSymbolC;
+    Def:  string; //name of type, name or "S:tag" (typedef: editable!)
+    BaseType: TTypeDef; //
       //intended purpose: dummy typedefs for anonymous complex types.
   //values, depending on kind:
     StrVal: string; //format: Ansi?
@@ -259,11 +259,12 @@ type
 
   TTypeDef = class(TSymbolC)
   protected
+    typename, ptrname: string; //if explicitly named, for use in "struct tag *" refs
     function  GetCaption: string; override;
   public
     constructor Create(const AName: string; AKey: integer = 0); override;
     //property  Ref: string read GetName; //quote???
-    function  Ref: string;
+    function  Ref(fPtr: boolean): string;
     //property  Def: string read StrVal write StrVal;
     //property  toString: string read GetCaption;
   end;
@@ -452,8 +453,8 @@ other - local
     loc: RFileLoc;
     nameID:  integer; //scanner symbol ID
     Value: TSymVal;
-    basetype: TTypeDef; //complex type, tagged -> S:<name>, U:<name>, E:<name>
-    declSym: TSymbolC;  //as soon as created
+    basetype: TTypeDef; //if complex type, tagged -> S:<name>, U:<name>, E:<name>
+    declSym: TSymbolC;  //this type, as soon as created
     procedure Init;   //~constructor, clear everything
     procedure Reset;  //init declarator, keep specification
     procedure makeTagRef(sue: eKey; const tagname: string);
@@ -1988,7 +1989,8 @@ begin
 (* The default (top level) scope is Globals?
   C: only "static" is not exported!
 *)
-  if (self.name = '') or (declSym <> nil) then
+  if (self.name = '') //anonymous
+  or (declSym <> nil) then //symbol already created
     exit; //nothing to do?
   scope := declScope;
   case storage of
@@ -2004,18 +2006,21 @@ begin
         if (specToken in [Kenum, Kstruct, Kunion])
         and (spec[2] = '{') then begin
         //untagged struct
-          if (pre = '') and (post = '') then begin
-          //if True ???
+          if (pre = '') and (post = '') then begin //the struct itself
+          //if True ??? - fully unspecified?
             typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
             typ.loc := self.loc;
             basetype := typ;
-            spec := quoteType(basetype.name);
+            spec := quoteType(basetype.name); //indicate non-basic typeref
           //finish enums? - problem: mbrScope cleared before decl spec!
             if spectoken = Kenum then begin
               finishEnum;
             end;
+          //flag defined typename in basetype!?
+            basetype.typename := name; //to be used in ref <- struct tag
           end else begin
-          //requires synthetic name
+          //requires synthetic name, for what?
+            todo(); //reached when?
           end;
         end else if (spec = '') then begin
         //more cases!!!
@@ -2024,12 +2029,26 @@ begin
           log('spec?', lkDebug);
           self.type_specifier(Kint, True);  //???
         end else if getDef = '' then
-          Log('unknown basetype', lkBug);
+          LogBug('unknown basetype');
         //else assume valid spec???
-      end;
+      end; //no basetype defined before
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
       declSym.BaseType := self.basetype;
+    (* propagate defined names into basetype, as typeref (quoted)
+      for us in "struct tag" and "struct tag *" references
+    *)
+      if basetype <> nil then begin
+      //direct or ptr name?
+        if post <> '' then
+          LogBug('handle typedef postfix '+post);
+        if pre = '' then
+          basetype.typename := quoteType(name)
+        else if pre = '*' then
+          basetype.ptrname := quoteType(name)
+        else //assume all other types are used by direct ref to typename!?
+          LogBug('unhandled typedef ' + pre + post);
+      end;
     end;
   {$ELSE}
     begin
@@ -2287,11 +2306,13 @@ if false then
 //else type stays undefined - check explicitly for (global) procs!
 
   Result := self.post + self.pre + self.spec;
+
 if False then //better, but should not be required any more
   if Result = '' then begin
     type_specifier(Kint, True);
     Result := self.post + self.pre + self.spec;
   end;
+
 (* static - storage duration or linkage?
   Here we only flag the existence of "static".
   The applicable scope (linkage) is only affected by "extern".
@@ -2333,13 +2354,26 @@ begin
   Result := self.Name + '=' + self.Def;
 end;
 
-function TTypeDef.Ref: string;
+(* Always quoted typename? Meta type ref IS quoted!
+*)
+function TTypeDef.Ref(fPtr: boolean): string;
 begin
+  if fPtr then
+    Result := ptrname
+  else
+    Result := typename;
+  if Result <> '' then
+    exit; //taken from typedef
   Result := GetName;
+//quotes always?!
   if Result[2] = ':' then begin
   //anonymous SUE type? or what?
   //try tag ref, found how?
     Result := QuoteType(Result);
+  end;
+  if fPtr then begin //what if Pascal name is really required???
+    Result := '*'+Result; //used also for meta (fn params!)
+    //Result := '^'+Result; //make Pascal ref?
   end;
 end;
 
@@ -2430,9 +2464,9 @@ begin
   Result := name;
   if (Def <> '') {and (Def <> '#')} then begin
     { TODO : parameter names with/out $1 scope? }
-    Result := Result + ':' + Def
+    Result := Result + ':' + Def //basetype: full definition!
   end else if BaseType <> nil then
-    Result := Result + ':' + BaseType.Ref;
+    Result := Result + ':' + BaseType.Ref(False); //Ref() returns quoted pretty name
 end;
 
 (* UniqueName - add dupe count postfix
@@ -2446,7 +2480,7 @@ begin
   if self.DupeCount > 0 then
     Result := Result + '_' + IntToStr(DupeCount);
   if (TypePrefix <> '') and (kind = stTypedef) then
-    Result := TypePrefix + Result;
+    Result := TypePrefix + Result; //obsolete, Pascal output only: 'T...'
 end;
 
 function TSymbolC.GetName: string;
@@ -2462,6 +2496,8 @@ begin
     Result := inherited GetName;
 end;
 
+(* Name and Scope, if not in Globals
+*)
 function TSymbolC.MetaName: string;
 begin
   Result := inherited GetName;

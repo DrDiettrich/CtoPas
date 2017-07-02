@@ -1004,7 +1004,7 @@ end;
 
 (* Must return a type name for a possibly complex reference.
   Handle ':' in code, indicating unfinished type declaration.
-  Accept ['*']S:tagName (:num?)
+  Accept ['*']"S:tagName" (:num?)
 *)
 function TToPas.TypeRefRequired: string;
 var

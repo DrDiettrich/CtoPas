@@ -80,7 +80,7 @@ type
     function  declaration_specifiers: boolean;
     function  init_declarator_list: boolean;
       procedure finishDeclaration;
-    function  declarator: boolean;
+    function  declarator: boolean; //determines name etc.
     function  recordBlock: boolean; //load {...}
     function  recordExpr: boolean;
     function  compound_statement(proc: TSymProc): boolean;
@@ -1039,11 +1039,11 @@ var
     //create public name??? - delay
       r.name := IntToStr(Globals.TypeCount);
       r.nameID := 0;  //todo: substitute typename, if found
-      r.loc := ScanSym.loc; //???
+      r.loc := ScanSym.loc; //??? preceding key "struct"?
   {$IFEND}
-    end else
+    end else //not a typedef --> type of var...
       r.name := '';
-    r.makeTagRef(sue, r.name);
+    r.makeTagRef(sue, r.name); //name like S:tag
   end;
 
   function  enum_specifier: boolean;
@@ -1177,7 +1177,7 @@ begin //declaration_specifiers
       Result := enum_specifier;
       //done := True;
     end else if i_ttyp in complex_type_specifiers then begin
-      Result := struct_or_union;
+      Result := struct_or_union; //?tag ?{...}
     //end else if not done and (i_ttyp = t_sym)
     end else if (i_ttyp = t_sym) and (r.specToken = t_empty)
     and (Globals.isType(ScanText) >= 0) then begin
@@ -1191,6 +1191,7 @@ begin //declaration_specifiers
 //finish - allow for old style parameter lists, with names only!
 {$DEFINE defType}
 {$IFDEF defType}
+//default type is "int"
   if Result and not fOldParams and (r.specToken = t_empty) then
     r.type_specifier(Kint, True); //really required?
 {$ELSE}
@@ -1393,7 +1394,7 @@ declarator :
 [pointer] direct_declarator
 MS extension: qualifiers!!!
 *)
-  pr.Create(r.mbrScope);  //if exists?
+  pr.Create(r.mbrScope);  //remember scope, if given
   startDecl; //!!! non-reentrant !!!
   while i_ttyp in declarator_qualifierS do begin
 {$IF __opMul}
@@ -1401,7 +1402,7 @@ MS extension: qualifiers!!!
 {$ELSE}
     if i_ttyp = opStar_ then begin
 {$IFEND}
-    (*
+    (*  special case: prefix as pointer
     pointer :
     {"*" [type_qualifier_list]}
     *)
@@ -1422,7 +1423,7 @@ MS extension: qualifiers!!!
     A name can occur only inside this declarator!
     No postfix modifiers can have occured by now.
 
-    Initialize an temporary declarator, fake an (non-existing) specification.
+    Initialize a temporary declarator, fake a (non-existing) specification.
   *)
     pr.Clear;  //start nested declaration
     pr.r.specToken := i_ttyp; //prevent modification of spec
@@ -1435,7 +1436,7 @@ MS extension: qualifiers!!!
     r.nameID := pr.r.nameID;
     r.loc := pr.r.loc;
   {$ELSE}
-    r.propagateName(pr.r);
+    r.propagateName(pr.r); //from declarator
   {$ENDIF}
     if pr.r.call <> t_empty then
       r.qualify(pr.r.call, True);
