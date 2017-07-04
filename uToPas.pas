@@ -34,6 +34,7 @@ interface
 uses
   Classes,
   config, //{$I config.pas}
+  uSynCheck, //check allowed in OPL syntax
   uTranslator,
   uTokenC, uTablesC;
 
@@ -392,7 +393,8 @@ type
     procedure WriteInc(const s: string);
     procedure WriteName(d1, d2: char);
     function  Unquoted(delim: char): string;
-    function  TypeRefRequired: string;
+    function  TypeRefRequired(ptrAllowed: boolean=False): string;
+    procedure CreateComplexTypeNames;
   protected //type related, pc based parser!!!
     typeswritten: boolean;  //standard types
     procedure TypeSection;  //also write default types...
@@ -1003,48 +1005,96 @@ begin
 end;
 
 (* Must return a type name for a possibly complex reference.
+  Should return Symbol?
+
+Currently used for poCast (only), followed by opComma
+  expect also for consts, vars, params and Result?
+
+Names for complex types must be handled before (init)
+
   Handle ':' in code, indicating unfinished type declaration.
   Accept ['*']"S:tagName" (:num?)
+
+  Scanning by tokens -> "type" (t_str) -> unquoted in ScanText,
+    same for t_sym
 *)
-function TToPas.TypeRefRequired: string;
+function TToPas.TypeRefRequired(ptrAllowed: boolean): string;
 var
   id: integer;
   sym: TSymType;
+  tsym: TTypeDef;
   psym: PSymPrep;
   def: string;
+  fPtr: boolean;
+  i: integer;
+const
+  BadResult = '???'; //or empty?
+{$IFDEF old}
+  //function makeType: string; - using parent Result!
+  procedure makeType;
+  var
+    sym: TTypeDef;
+  begin
+    assert(tsym <> nil,'missing base type');
+    sym := Globals.defType(Result, def, 0); //synthetic, no altID
+    sym.BaseType := tsym;
+    sym.loc := tsym.loc; //leave undefined?
+  end;
+{$ELSE}
+{$ENDIF}
+
 begin
 //handle type ref
-  def := '???'; //error indicator
-  //expect(opType, 'no type to cast');
-  //WriteType;
-  if skip(opStar0) then begin
-    Result := TypeRefRequired; //creates type, if not alrady defined
-    assert(Result <> '', 'bad type ref');
-    def := '*'+Result; //for type def
-    Result := 'P' + Result;
-    //also must be/become typename
-  end else begin
-    Result := ScanText; //first token of this reference
-    def := Result; //cannot define 'sym = sym'!!!???
-  //correct so far, but token can be typename (t_sym) or built-in (Kint...)!
-    expect(t_sym, 'no typename'); //minimum: 'S' !!!invalidates ScanSym!!!
-    if skip(opColon) then begin //fake type-ref!!!
-      assert(Result = 'S', 'not struct tag ref');
-      def := Result + ':' + ScanText; //if symbol must be created
-      Result := Result + '_' + ScanText; //expected fake name
-      //now ScanSym=tagname!
+  Result := BadResult; //error indicator
+  def := ''; //nothing found
+  fPtr := skip(opStar0);
+  case i_ttyp of
+  //todo: simple types
+  //todo: proc type
+  t_str: //quoted typename - check for S:...!
+    begin
+      def := ScanText; //unquoted string
+      nextToken; //past ref
     end;
-    //must be/become typename
+  t_sym, t_symNX: //unquoted ref?
+    begin
+      def := ScanText;
+      if nextToken = opColon then begin
+      //get tag, expected S/U/E only! num instead of tagsym?
+        if nextToken <> t_sym then begin
+          LogBug('expected tag name');
+          exit;
+        end;
+        def := def + ':' + ScanText;
+        nextToken; //past tagname
+      end;
+    end;
+  else
+    LogBug('unexpected char in type');
+    //Result := def; ?
+    exit;
+  end; //case
+
+//now def is the scanned typeref
+//check for ':'
+  i := Pos(':', def);
+  tsym := Globals.getType(def);
+  if tsym = nil then begin
+    LogBug('how create new type for '+def);
+    exit;
   end;
-//make sure we got a symbol, should be a type sym
-  assert(i_ttyp=t_sym, 'no type sym'); //maybe num?
-  if ScanSym.mackind = skType then //ScanSym valid?
-    exit; //okay, is already a type
-//not yet as type
-  if ScanSym.mackind <> skSym then
-    Log('retype sym?', lkBug);
-  id := ScanToken.symID; //also update typeID!
-//make sure that the type has been defined?
+
+//if got typesym, try use defined name
+  if i > 0 then begin //lookup complex type from typedef
+  //assume all typenames have been synthesized!
+    if fPtr then
+      Result := tsym.ptrname
+    else
+      Result := tsym.typename;
+    exit; //done
+  end;
+
+  //make sure that the type has been defined?
   if Globals.getType(Result) = nil then begin
   //is not a defined type
   //todo: define in uParseC, when reference occurs!
@@ -1053,7 +1103,7 @@ begin
     sym := Globals.defType(Result, def, id); //def=???
   //all done?
   end;
-  nextToken;
+  //nextToken; - already past expected type ref
 end;
 
 procedure TToPas.WriteTypeRef;
@@ -1117,7 +1167,7 @@ begin
   end;
 
   case pc^ of
-  '"':  //try decode base type
+  typeQuote: //try decode base type
     begin //single level search, for now
       s := Unquoted(typeQuote);
       typ := Globals.getType(s);
@@ -1339,7 +1389,7 @@ end;
 procedure TToPas.WriteType;
 begin //switch to pc scanning
   pc := ScanToken.pc;
-  WriteTypePc(inNone);
+  WriteTypePc(inNone); //advance pc until #0
   scanner.ScanPChar(pc);
 end;  // wrapper
 
@@ -1351,9 +1401,12 @@ begin
     Outdent('type');
     curkind := stTypeDef;
   end;
+//todo: make and use this as unit
   if not typeswritten then begin
+    CreateComplexTypeNames;
     typeswritten := True;
 //standard types
+//todo: store in separate unit (C_API?)
     Outdent('//"S"igned and "U"nsigned types of specific size');
       WriteLn('SInt1 = ShortInt;');
       WriteLn('SInt2 = SmallInt;');
@@ -1380,6 +1433,11 @@ begin
   end;
 end;
 
+procedure TToPas.CreateComplexTypeNames;
+begin
+  //on-the-fly in WriteTypeSym(complex)?
+end;
+
 (* Problem with ':' in tag refs!
   Here: fake name with : replaced by _
   Also: for tag ref: prefix by Ps_tag=*<fake>
@@ -1390,23 +1448,10 @@ end;
 procedure TToPas.WriteTypeSym;
 var
   s: string;
-
+  esu: char;
   procedure WriteFake;
-  var
-    name: string;
-    sym: TTypeDef;
   begin
-    name := 'P'+s;
-    sym := Globals.getType(name);
-    if sym = nil then begin
-      sym := Globals.defType(name,'',0); //should be acceptable
-    end;
-    if sym.Def = '' then begin //just created?
-      //sym.Def := '*'+s;
-      sym.Def := '*'+typeQuote +s+ typeQuote; //s quoted as type ref
-    end;
-    WriteLn(name + ' = ^' + s + ';' + ' //forward');
-    //todo: mark ptr-type shown
+    WriteLn(unQuoteType(typ.ptrname) + ' = ^' + unQuoteType(s) + ';' + ' //forward');
   end;
 
 begin
@@ -1414,18 +1459,28 @@ begin
     typ := sym as TTypeDef;
     if typ <> nil then begin
       TypeSection;
-      s := typ.Name;
+      s := typ.Name; //unquoted?
       pc := ScanDef(typ.Def);
+      if pc^ = typequote then
+        s := Unquoted(typeQuote)
+      else
+        beep; //what?
       if (Length(s) > 2) and (s[2] = ':') then begin
-      //convert tag name reference "t:tag" -> "t_tag"
-        s[2] := '_';
-        if (s[1]='S')
-        //or (s[1]='U') //also for union???
-        then
-          WriteFake; //show fake pointer before struct/union def
+        esu := s[1];
+        if typ.typename <> '' then
+          s := typ.typename //quoted??? yes, for meta output!
+        else begin
+        //convert tag name reference "t:tag" -> "t_tag"
+          s[2] := '_';
+          typ.typename := quoteType(s);
+          if typ.ptrname = '' then
+            typ.ptrname := quoteType('P' + s);
+          if (s[1] in ['S','U']) then
+            WriteFake; //show fake pointer before struct/union def
+        end;
       //now show the struct definition
-        Write(s + ' = ');
-        case s[1] of
+        Write(unQuoteType(s) + ' = ');
+        case esu of
         'E':  WriteEnum;
         'S':  WriteStruct(inNone);
         'U':  WriteUnion(inNone);
@@ -1438,7 +1493,7 @@ begin
         //not everything converted
           s := string(pc);
           if s = 'v' then
-            Write('record {void} end')
+            Write('record {undefined} end')
           else
             Write(' ??? ' + string(pc) + ' ???');
         end;
@@ -1581,6 +1636,7 @@ begin
   }
     WriteLn(';');
   end;
+  WriteLn(' '); //separator
 end;
 
 procedure TToPas.WriteParams;
@@ -2219,7 +2275,7 @@ var //reduce try/finally blocks
           //possible problem: now these are 2 statements! - may require begin...end
             Write('begin Result := ' + ExpressionString(t_empty) + '; exit; end');
           end else
-            Write('exit;');
+            Write('exit'); //'exit;' -> ;;
         end;
       Kswitch: //switch(expr, {stmt-list});
         begin
@@ -2363,6 +2419,8 @@ begin
 //"interface" already shown.
 //"uses"???
 //imports?
+
+//todo: make and use unit (conditionally?)
 {$IFDEF old}
   if (self.LibName <> '') and not fLibName then begin
     ConstSection;
@@ -2390,7 +2448,7 @@ const
 
   for i := 0 to Scope.Count - 1 do begin
     sym := Scope.getSym(i);
-  //hide static symbols
+  //hide static symbols - also hides all symbols with empty Def!!!
     if (sym.Def <> '') and (sym.Def[1] <> '!') then
       TranslateSym(sym);
   end;
@@ -2532,14 +2590,35 @@ begin //WriteImpl
   Outdent('implementation');
   //WriteLn(' ');
   self.curkind := stUnknown;  //-> empty line before next clause
-//show statics and declarations
+
+(* ALL symbols created in Statics, except types and extern procs.
+*)
+//show statics and declarations - dupes public procs???
+  for i := 0 to Statics.Count - 1 do begin
+    sym := Statics.getSym(i);
+  //don't duplicate vars etc.!
+    if (sym.Def <> '') and (sym.Def[1] = '!') then
+      TranslateSym(sym) //only really static
+    else if sym.kind = stProc then begin
+    //always show proc implementation
+      WriteProcSym;
+    end;
+  end;
+{$IFDEF old} //each implemented item in Statics=Module
   for i := 0 to scope.Count - 1 do begin
     sym := Scope.getSym(i);
-    if (sym.Def <> '') and (sym.Def[1] = '!') then
-      TranslateSym(sym)
-    else if sym.kind = stProc then
+    if (sym.Def <> '') and (sym.Def[1] = '!') then //never true!!!
+      TranslateSym(sym);
+    else if sym.kind = stProc then begin
       WriteProcSym;
+    end;
   end;
+{$ELSE}
+//todo: def. external procs because not listed in Statics
+{$ENDIF}
+
+(* ToDo: Do not require file for macro output!
+*)
 //show macros - better before anything else?
 if ShowMacs then begin
   if Globals.DefFile <> '' then begin

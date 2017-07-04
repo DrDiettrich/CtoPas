@@ -21,7 +21,8 @@ uses
   fConfiguration in 'fConfiguration.pas' {ConfigViewer},
   fSymView in 'fSymView.pas' {SymView},
   uTranslator in 'uTranslator.pas',
-  fMacros in 'fMacros.pas' {MacroChecker};
+  fMacros in 'fMacros.pas' {MacroChecker},
+  uSynCheck in 'uSynCheck.pas';
 
 {$R *.RES}
 

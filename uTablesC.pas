@@ -259,14 +259,15 @@ type
 
   TTypeDef = class(TSymbolC)
   protected
-    typename, ptrname: string; //if explicitly named, for use in "struct tag *" refs
     function  GetCaption: string; override;
   public
+    typename, ptrname: string; //if explicitly named, for use in "struct tag *" refs
     constructor Create(const AName: string; AKey: integer = 0); override;
     //property  Ref: string read GetName; //quote???
     function  Ref(fPtr: boolean): string;
     //property  Def: string read StrVal write StrVal;
     //property  toString: string read GetCaption;
+    function  BodyString: string; override;
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -493,6 +494,7 @@ const
 
 function  quoteName(const Aname: string): string;
 function  quoteType(const Aname: string): string;
+function  unQuoteType(const Aname: string): string;
 //function  unifyName(const n: string; cnt: integer): string;
 function  unifiedName(const n: string; cnt: integer): string;
   //common format for disambiguated names
@@ -578,6 +580,15 @@ begin
     Result := ''
   else
     Result := typeQuote + Aname + typeQuote;
+end;
+
+function unQuoteType(const Aname: string): string;
+begin
+  Result := Aname;
+  if Result = '' then
+    exit;
+  if Result[1] = typequote then
+    Result := Copy(Result, 2, Length(Result)-2);
 end;
 
 function  unifiedName(const n: string; cnt: integer): string;
@@ -2041,6 +2052,7 @@ begin
       if basetype <> nil then begin
       //direct or ptr name?
         if post <> '' then
+        //type proc: (...) 
           LogBug('handle typedef postfix '+post);
         if pre = '' then
           basetype.typename := quoteType(name)
@@ -2340,6 +2352,14 @@ end;
 
 { TTypeDef }
 
+function TTypeDef.BodyString: string;
+begin
+  if Def = '' then
+    Result := '={undefined:v;}'//flag undefined, somehow!?
+  else
+    Result := ''; //as inherited
+end;
+
 constructor TTypeDef.Create(const AName: string; AKey: integer);
 begin
   inherited;
@@ -2439,7 +2459,7 @@ begin
     if (self.Def = '') and (self.StrVal = '') then begin
       if (basetype <> nil) and (self.kind = stEnumMember) then
         Result := name + ' in ' + self.BaseType.name
-      else
+      else //almost: undefined struct
         Result := name + ' = what?';  //should be overridden in derived class!
     end else begin
       //Result := name + ':' + Def + ' = ' + StrVal;  //default
@@ -2456,7 +2476,7 @@ begin
         Result := Result + '=' + StrVal;  //default
     end;
   end else
-    Result := name + Result;
+    Result := name + Result;  //BodyString must supply =/: or whatever
 end;
 
 function TSymbolC.TypedName: string;
@@ -2764,8 +2784,9 @@ function TSymProc.BodyString: string;
 begin
 //bug - proc instead of proc-var!
   if FBody <> nil then
-    Result := FBody.toString;
-  //else  //";" should be reserved for wrapped lines!
+    Result := FBody.toString
+  else  //";" should be reserved for wrapped lines!
+    Result := ''; //???
 end;
 
 function TSymProc.toString: string;
