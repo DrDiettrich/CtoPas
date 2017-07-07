@@ -1861,6 +1861,7 @@ end;
   for tagged types the declaration is stored in the explicit type (.basetype)
     and .spec becomes a reference to this type.
 *)
+//currently unused!
 procedure RType.finishComplex;
 begin
 (* struct/union/enum becomes spec!
@@ -2026,22 +2027,26 @@ begin
         if (specToken in [Kenum, Kstruct, Kunion])
         and (spec[2] = '{') then begin
         //untagged struct
-          if (pre = '') and (post = '') then begin //the struct itself
-          //if True ??? - fully unspecified?
-            typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
-            typ.loc := self.loc;
-            basetype := typ;
-            spec := quoteType(basetype.name); //indicate non-basic typeref
-          //finish enums? - problem: mbrScope cleared before decl spec!
-            if spectoken = Kenum then begin
-              finishEnum;
+          if (post = '') then begin //the struct itself
+            if (pre = '') then begin
+            //if True ??? - fully unspecified?
+              typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
+              typ.loc := self.loc;
+              basetype := typ;
+              spec := quoteType(basetype.name); //indicate non-basic typeref
+            //finish enums? - problem: mbrScope cleared before decl spec!
+              if spectoken = Kenum then begin
+                finishEnum;
+              end;
+            //flag defined typename in basetype!?
+              //basetype.typename := name; //to be used in ref <- struct tag
+            end else if pre = '*' then
+              //handled below
+            else begin
+            //requires synthetic name, for what?
+              todo(); //reached when?
             end;
-          //flag defined typename in basetype!?
-            basetype.typename := name; //to be used in ref <- struct tag
-          end else begin
-          //requires synthetic name, for what?
-            todo(); //reached when?
-          end;
+          end //post=''
         end else if (spec = '') then begin
         //more cases!!!
           self.type_specifier(Kint, True);  //???
@@ -2344,7 +2349,8 @@ if False then //better, but should not be required any more
 *)
   if self.storage = Kstatic then begin
     Result := StaticScope + Result;
-  end;
+  end else if self.storage = Kextern then
+    Result := ExternScope + Result;
 end;
 
 procedure RType.propagateName(const t: RType);
@@ -2414,14 +2420,18 @@ end;
 *)
 procedure TTypeDef.Settypename(const Value: string);
 begin
-  if (Ftypename = '') and (Pos(':', name) > 1) then
-    Ftypename := quoteType(Value);
+  if (Ftypename = '') and (Pos(':', name) > 1) then begin
+    if Globals.getType(Value) = nil then
+      LogBug('undefined type') //must create before!
+    else
+      Ftypename := quoteType(Value);
+  end;
 end;
 
 function TTypeDef.Gettypename: string;
 begin
   Result := Ftypename;
-  if Result <> '' then
+  //if Result <> '' then
     exit;
   Result := name;
 end;
@@ -2429,14 +2439,18 @@ end;
 procedure TTypeDef.Setptrname(const Value: string);
 begin
   if (Fptrname = '') //and (Pos(':', name) > 1)
-  then
-    Fptrname := quoteType(Value);
+  then begin
+    if Globals.getType(Value) = nil then
+      LogBug('undefined type')
+    else
+      Fptrname := quoteType(Value);
+  end;
 end;
 
 function TTypeDef.Getptrname: string;
 begin
   Result := Fptrname;
-  if Result <> '' then
+  //if Result <> '' then
     exit;
   Result := '*'+quoteType(name); //??? :?
 end;

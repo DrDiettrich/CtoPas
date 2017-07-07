@@ -1082,7 +1082,7 @@ begin
   i := Pos(':', def);
   tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
   if tsym = nil then begin
-    def[i] := '_';
+    //def[i] := '_';
     tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
   end;
   if tsym = nil then begin
