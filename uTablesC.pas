@@ -258,16 +258,24 @@ type
 {$IFEND}
 
   TTypeDef = class(TSymbolC)
+  private
+    Ftypename: string;
+    Fptrname: string;
+    procedure Setptrname(const Value: string);
+    procedure Settypename(const Value: string);
+    function Getptrname: string;
+    function Gettypename: string;
   protected
     function  GetCaption: string; override;
   public
-    typename, ptrname: string; //if explicitly named, for use in "struct tag *" refs
     constructor Create(const AName: string; AKey: integer = 0); override;
     //property  Ref: string read GetName; //quote???
     function  Ref(fPtr: boolean): string;
     //property  Def: string read StrVal write StrVal;
     //property  toString: string read GetCaption;
     function  BodyString: string; override;
+    property typename: string read Gettypename write Settypename; //if explicitly named, for use in "struct tag" refs
+    property ptrname: string read Getptrname write Setptrname; //for use in "struct tag *" refs
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -576,8 +584,8 @@ end;
 
 function quoteType(const Aname: string): string;
 begin
-  if Aname = '' then
-    Result := ''
+  if (Aname = '') or (Aname[1] = typequote) then
+    Result := Aname
   else
     Result := typeQuote + Aname + typeQuote;
 end;
@@ -2052,15 +2060,17 @@ begin
     *)
       if basetype <> nil then begin
       //direct or ptr name?
-        if post <> '' then
-        //type proc: (...) 
-          LogBug('handle typedef postfix '+post);
-        if pre = '' then
-          basetype.typename := quoteType(name)
-        else if pre = '*' then
-          basetype.ptrname := quoteType(name)
-        else //assume all other types are used by direct ref to typename!?
-          LogBug('unhandled typedef ' + pre + post);
+        if post <> '' then //can never become typename of basetype
+        //type proc: (...)
+          //LogBug('handle typedef postfix '+post);
+        else if pre = '' then begin
+          if basetype.typename = '' then
+            basetype.typename := quoteType(name);
+        end else if pre = '*' then begin
+          if basetype.ptrname = '' then
+            basetype.ptrname := quoteType(name)
+        end else //assume all other types are used by direct ref to typename!?
+          LogBug('unhandled typedef prefix ' + pre);
       end;
     end;
   {$ELSE}
@@ -2387,7 +2397,8 @@ begin
     exit; //taken from typedef
   Result := GetName;
 //quotes always?!
-  if (Length(Result) > 2) and (Result[2] = ':') then begin
+  //if (Length(Result) > 2) and (Result[2] = ':') then
+  begin
   //anonymous SUE type? or what?
   //try tag ref, found how?
     Result := QuoteType(Result);
@@ -2396,6 +2407,38 @@ begin
     Result := '*'+Result; //used also for meta (fn params!)
     //Result := '^'+Result; //make Pascal ref?
   end;
+end;
+
+(* Only name structured types, to get rid of ':'.
+  Don't rename, if explicitly set
+*)
+procedure TTypeDef.Settypename(const Value: string);
+begin
+  if (Ftypename = '') and (Pos(':', name) > 1) then
+    Ftypename := quoteType(Value);
+end;
+
+function TTypeDef.Gettypename: string;
+begin
+  Result := Ftypename;
+  if Result <> '' then
+    exit;
+  Result := name;
+end;
+
+procedure TTypeDef.Setptrname(const Value: string);
+begin
+  if (Fptrname = '') //and (Pos(':', name) > 1)
+  then
+    Fptrname := quoteType(Value);
+end;
+
+function TTypeDef.Getptrname: string;
+begin
+  Result := Fptrname;
+  if Result <> '' then
+    exit;
+  Result := '*'+quoteType(name); //??? :?
 end;
 
 { TSymbolC }

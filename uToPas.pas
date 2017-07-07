@@ -1052,6 +1052,7 @@ begin
   case i_ttyp of
   //todo: simple types
   //todo: proc type
+  Kvoid..Kuint64_t, //simple types
   t_str: //quoted typename - check for S:...!
     begin
       def := ScanText; //unquoted string
@@ -1076,15 +1077,20 @@ begin
     exit;
   end; //case
 
-//now def is the scanned typeref
+//now def is the scanned typeref, unquoted
 //check for ':'
   i := Pos(':', def);
   tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
+  if tsym = nil then begin
+    def[i] := '_';
+    tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
+  end;
   if tsym = nil then begin
     LogBug('how create new type for '+def);
     exit;
   end;
 
+{$IFDEF old}
 //if got typesym, try use defined name
   if i > 0 then begin //lookup complex type from typedef
   //assume all typenames have been synthesized!
@@ -1092,6 +1098,7 @@ begin
       Result := tsym.ptrname
     else
       Result := tsym.typename;
+    assert(Result <> '', 'no typename assigned?');
     exit; //done
   end;
 
@@ -1104,6 +1111,10 @@ begin
     sym := Globals.defType(unQuoteType(Result), def, id); //def=???
   //all done?
   end;
+{$ELSE}
+{$ENDIF}
+//default: tsym.name or what?
+  Result := tsym.Ref(fPtr); //?
   //nextToken; - already past expected type ref
 end;
 
