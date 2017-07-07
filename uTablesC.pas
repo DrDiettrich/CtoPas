@@ -220,7 +220,7 @@ type
       //questionable!
   public
     kind: eSymType;
-    DupeCount:  byte;
+    DupeCount:  byte; //determined when added to dupe list
       //intended purpose: substitution of conflicting names
     ScopeNum:   byte;  //byte should be sufficient?
     //name: string; //? for independence from owner list?
@@ -1620,7 +1620,8 @@ end;
 
 function TTypeDefs.getType(const AName: string): TSymType;
 begin
-  TSymbolC(Result) := getSym(AName);
+//handle both quoted and unquoted ref
+  TSymbolC(Result) := getSym(unQuoteType(AName));
   if (Result <> nil) and (Result.kind <> stTypedef) then
     Result := nil;
 end;
@@ -2047,7 +2048,7 @@ begin
       declSym.loc := self.loc;
       declSym.BaseType := self.basetype;
     (* propagate defined names into basetype, as typeref (quoted)
-      for us in "struct tag" and "struct tag *" references
+      for use in "struct tag" and "struct tag *" references
     *)
       if basetype <> nil then begin
       //direct or ptr name?
@@ -2386,7 +2387,7 @@ begin
     exit; //taken from typedef
   Result := GetName;
 //quotes always?!
-  if Result[2] = ':' then begin
+  if (Length(Result) > 2) and (Result[2] = ':') then begin
   //anonymous SUE type? or what?
   //try tag ref, found how?
     Result := QuoteType(Result);
@@ -2507,8 +2508,8 @@ function TSymbolC.GetName: string;
 begin
 (* modes:
   normal: name (possibly including $scope)
-  meta: name + $scope
-  target: name [-$scope + _dupe]?
+  meta: name + $scope, while parsing compound_statement
+  target: name [-$scope + _dupe]? + S:tag -> typedef'd name...
 *)
   if fMetaNames then
     Result := MetaName

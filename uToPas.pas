@@ -462,7 +462,7 @@ begin
   end else
     LibName := ALibName;  //must include '.dll'!?
   self.PrjType := ptUnit;
-  self.UnitType := utImport;  //using LibName
+  self.UnitType := utImport;  //using LibNames
 //todo: handle macros and imports properly
   Result := Self.Translate;
 end;
@@ -1006,6 +1006,7 @@ end;
 
 (* Must return a type name for a possibly complex reference.
   Should return Symbol?
+  String from type/ptrname is quoted! (typeref)
 
 Currently used for poCast (only), followed by opComma
   expect also for consts, vars, params and Result?
@@ -1078,7 +1079,7 @@ begin
 //now def is the scanned typeref
 //check for ':'
   i := Pos(':', def);
-  tsym := Globals.getType(def);
+  tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
   if tsym = nil then begin
     LogBug('how create new type for '+def);
     exit;
@@ -1100,28 +1101,44 @@ begin
   //todo: define in uParseC, when reference occurs!
     beep; //debug, must have been defined!!!
   //def in recursive invocation??? basetype? (only AFTER sym creation!)
-    sym := Globals.defType(Result, def, id); //def=???
+    sym := Globals.defType(unQuoteType(Result), def, id); //def=???
   //all done?
   end;
   //nextToken; - already past expected type ref
 end;
 
+(* read quoted typename, show Pascal name
+  Quoted name always refers to a type symbol (check!)
+  Structured types must have a defined type name,
+    without ':', use it!
+    if empty, create name for later use.
+
+  Add pointer flag, to show ptrname instead of typename?
+
+Problem: unique name?
+  Use tsym.UniqueName?
+*)
 procedure TToPas.WriteTypeRef;
 var
   s: string;
   i: integer;
-begin //got quoted typename - unquote
-  s := Unquoted(typeQuote);
-  i := Pos(':', s);
-{$IFDEF old}
-  if (Length(s) > 2) and (s[2] = ':') then begin
-  //remove S/U/E from tagged ref?
-    s[2] := '_';
+  tsym: TTypeDef;
+begin //expect quoted typename - unquote
+  s := Unquoted(typeQuote); //ready for lookup by name
+  tsym := Globals.getType(s); //either w/o quotes
+  assert(tsym <> nil, 'type ref without type');
+//better use namesym and show its unique name?
+  if (tsym.typename <> '') then begin
+    //UniqueName(s)
+    Write(unQuoteType(tsym.typename));
+    exit;
   end;
-{$ELSE}
-  if i > 0 then
+//no typename, check name
+  i := Pos(':', s);
+  if i > 0 then begin
     s[i] := '_';
-{$ENDIF}
+    tsym.typename := quoteType(s); //for later use
+  end;
   Write(s);
 end;
 
@@ -1197,38 +1214,48 @@ procedure TToPas.WriteEnum;
 begin //E{...}
   if pc^ = 'E' then
     inc(pc);  //in declaration ...E{
-  assert(pc^ = '{', 'expected "{"');
-  inc(pc);
-  WriteLn('(');
-  inc(indent);
-//write members
-  while pc^ <> '}' do begin
-  //expect: <name>=<#>,
-  //can be: <name>, !!!?
-    WriteName('=', ListTerm);
-    if pc^ = '=' then begin
-      inc(pc);  //skip "="
-      if pc^ <> ListTerm then begin
-      (* ',' how here?
-        Hide explicit values? (become non-std enum!?)
-      *)
-        Write('{=');
-        WriteExprPc;  //(',');
-        Write('}');
+//assume bad calls, for elements?
+//may become current again
+  //assert(pc^ = '{', 'expected "{"');
+  if pc^ = '{' then begin
+  //member list
+    inc(pc);
+    WriteLn('(');
+    inc(indent);
+  //write members
+    while pc^ <> '}' do begin
+    //expect: <name>=<#>,
+    //can be: <name>, !!!?
+      WriteName('=', ListTerm);
+      if pc^ = '=' then begin
+        inc(pc);  //skip "="
+        if pc^ <> ListTerm then begin
+        (* ',' how here?
+          Hide explicit values? (become non-std enum!?)
+        *)
+          Write('{=');
+          WriteExprPc;  //(',');
+          Write('}');
+        end;
       end;
+      if pc^ = ListTerm then begin
+        inc(pc);
+        if pc^ <> '}' then
+          WriteLn(',');  //not after last member!
+      end else
+        break;  //unexpected
     end;
-    if pc^ = ListTerm then begin
-      inc(pc);
-      if pc^ <> '}' then
-        WriteLn(',');  //not after last member!
-    end else
-      break;  //unexpected
+    WriteLn('');  //flush last member
+    dec(indent);
+    inc(pc);  //skip "}"
+  //end
+    Write(')'); //add ';' later
+  end else begin
+  //unquoted type ref?
+    LogBug('unhandled E: ' + Scanner.LineText);
+    Write(Scanner.LineText); //.scanString()
+    WriteLn(' ???');
   end;
-  WriteLn('');  //flush last member
-  dec(indent);
-  inc(pc);  //skip "}"
-//end
-  Write(')'); //add ';' later
 end;
 
 procedure TToPas.WriteStruct(fIn: eSU);
@@ -1362,7 +1389,7 @@ begin
     '[':  WriteArray;
     '*':  WritePointer;
     '(':  WriteProcType;
-    typeQuote:  WriteTypeRef;
+    typeQuote:  WriteTypeRef; //string containing valid type name
     '+':  WriteUnSigned(False);
     '-':  WriteUnSigned(True);
     //'<':  WriteBitfield;
@@ -1444,10 +1471,18 @@ end;
     Add ptr type to global definitions, if not found
     Show always before struct def, even if already exists!
     ?ALSO for untagged struct? (cannot contain self-ref!)
+  Skip typesyms used with complex types:
+    show ptrname before Record
+    show typename in "typename = Record ..."
+    skip all syms with basetype.typename/ptrname = sym.name
+    ??? multiple names for same type ???
+    -> flag shown in sym -> requires ref to typesym and ptrsym!
+
+  Proc types???
 *)
 procedure TToPas.WriteTypeSym;
 var
-  s: string;
+  s, n: string;
   esu: char;
   procedure WriteFake;
   begin
@@ -1457,15 +1492,13 @@ var
 begin
   try
     typ := sym as TTypeDef;
+//todo: omit name sym of complex types (typ.basetype.typename=typ.name)
     if typ <> nil then begin
       TypeSection;
       s := typ.Name; //unquoted?
       pc := ScanDef(typ.Def);
-      if pc^ = typequote then
-        s := Unquoted(typeQuote)
-      else
-        beep; //what?
       if (Length(s) > 2) and (s[2] = ':') then begin
+      //struct type
         esu := s[1];
         if typ.typename <> '' then
           s := typ.typename //quoted??? yes, for meta output!
@@ -1487,13 +1520,22 @@ begin
         else  assert(False, 'expected S/U/E');
         end;
       end else begin
+      //simple type, or anon struct?
+      //todo: omit t=t !!!
+        if (typ.BaseType <> nil) then begin
+          n := quoteType(typ.name);
+          if (n = typ.BaseType.typename)
+          //or (n = typ.BaseType.ptrname) //if assigned while writing fake?
+          then //!fwd only S/U!
+            Write('//'); // exit; //already shown as name of basetype?
+        end;
         Write(s + ' = ');
         WriteTypePc(inNone); //type def, ^t valid (never convert!)
         if pc^ <> #0 then begin
         //not everything converted
           s := string(pc);
           if s = 'v' then
-            Write('record {undefined} end')
+            Write('record {undefined} end') //really?
           else
             Write(' ??? ' + string(pc) + ' ???');
         end;
@@ -2436,13 +2478,15 @@ const
   kernel32  = 'kernel32.dll';
   ...
 *)
-  ConstSection;
-//add dummy/default library
-  WriteLn(UnknownLib + ' = ''unknown.dll'';');
-  WriteLn(LibRef + ' = ''' + LibName + ''';');
-  for c := low(c) to high(c) do begin
-    //only if macro used?
-    WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
+  if UnitType = utImport then begin
+    ConstSection;
+  //add dummy/default library
+    WriteLn(UnknownLib + ' = ''unknown.dll'';');
+    WriteLn(LibRef + ' = ''' + LibName + ''';');
+    for c := low(c) to high(c) do begin
+      //only if macro used?
+      WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
+    end;
   end;
 {$ENDIF}
 

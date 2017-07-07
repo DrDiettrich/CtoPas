@@ -77,6 +77,8 @@ type
     Resize:   THashResize;
     Removed:  TRemoved;
     fCaseInsensitive: boolean;  //default: case sensitive
+    //fStack: boolean; //True:LiFo, else?
+    fOldestFirst: boolean; //True: Find oldest entry entry first
   protected
   //methods, internal
     function  GetHash(const AName: string): integer;  //case sensitive
@@ -331,8 +333,20 @@ begin
   item.FString := S;
   item.FObject := nil;
   root := GetItem(hash);
-  item.iNext := root.iFirst;
-  root.iFirst := Result;
+  if fOldestFirst then begin
+    item.iNext := -1;
+    if root.iFirst < 0 then
+      root.iFirst := Result
+    else begin
+    //link new item last
+      while root.iNext >= 0 do
+        root := GetItem(root.iNext);
+    end;
+    root.iNext := Result;
+  end else begin
+    item.iNext := root.iFirst;
+    root.iFirst := Result;
+  end;
 end;
 
 (* Unlink - unlink item at Index
@@ -490,15 +504,27 @@ begin
     p.iFirst := -1;
     p.iNext := -1;
   end;
-//now rebuild, bottom up to maintain LIFO order.
-  for i := 0 to FCount - 1 do begin
-    p := GetItem(i);
-    //assert(p <> nil);
-//OutputDebugString(PChar('rehash ' + p.FString));
-    h := GetHash(p.FString);
-    root := GetItem(h);
-    p.iNext := root.iFirst;
-    root.iFirst := i;
+//now rebuild
+  if fOldestFirst then begin
+  //top down to maintain FiFo order
+    for i := FCount - 1 downto 0 do begin
+      p := GetItem(i);
+      h := GetHash(p.FString);
+      root := GetItem(h);
+      p.iNext := root.iFirst;
+      root.iFirst := i;
+    end;
+  end else begin
+  //bottom up to maintain LIFO order.
+    for i := 0 to FCount - 1 do begin
+      p := GetItem(i);
+      //assert(p <> nil);
+  //OutputDebugString(PChar('rehash ' + p.FString));
+      h := GetHash(p.FString);
+      root := GetItem(h);
+      p.iNext := root.iFirst;
+      root.iFirst := i;
+    end;
   end;
 end;
 

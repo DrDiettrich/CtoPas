@@ -21,6 +21,7 @@ type
     fNoShow:  boolean;
     procedure SetTarget(Strings: TStrings);
     function  UniqueName(const s: string): string;
+      //from DupeList
     procedure Write(const s: string);
     procedure WriteSep(const s: string);
     procedure WriteLn(const s: string);
@@ -63,6 +64,7 @@ type
     function  AddSym(sym: TSymbolC): integer;
       //define identifier, assign sym.dupecount
     function  UniqueName(const s: string): string;
+      //for use in TTranslator - better: store in sym.PrettyName
   end;
 
 
@@ -100,7 +102,7 @@ var
   i: integer absolute Result;
 begin
   //sym.DupeCount := 0;
-  s := sym.UniqueName;  //possibly modified with type prefix...
+  s := sym.UniqueName;  //possibly modified with Pascal type prefix...
   cnt := 0;
   i := -1;
   while True do begin
@@ -119,6 +121,7 @@ begin
   Result := self.FList.Push(s); //FList.Add(s, True); //always add
   Items[Result].FObject := sym;
   sym.DupeCount := cnt;
+//todo: store Delphi name in sym
 end;
 
 constructor TDupeList.Create;
@@ -134,6 +137,10 @@ begin
   FList.fCaseInsensitive := not fCasedNames;  // True;
 end;
 
+(* Get/make unique (Pascal) name.
+
+Usage???
+*)
 function TDupeList.UniqueName(const s: string): string;
 var
   id, cnt: integer;
@@ -148,9 +155,9 @@ begin
     if Items[id].FString = s then begin
       TObject(sym) := Items[id].FObject;
       if sym <> nil then begin
-        Result := sym.UniqueName;
+        Result := sym.UniqueName; //based on symbol's DupeCount
         exit;
-      end;  //else keyword
+      end;  //else keyword, from KDelphi.txt etc.
     end;
     inc(cnt);
   end;
