@@ -223,6 +223,7 @@ type
     DupeCount:  byte; //determined when added to dupe list
       //intended purpose: substitution of conflicting names
     ScopeNum:   byte;  //byte should be sufficient?
+    storage: eStorageClass; //extern!?
     //name: string; //? for independence from owner list?
     Def:  string; //name of type, name or "S:tag" (typedef: editable!)
     BaseType: TTypeDef; //
@@ -537,8 +538,9 @@ const
   typeQuote = '"';  // '''';
   nameQuote = ''''; //'"';
   HexPrefix = '0x'; //meta format
-//scopes
+//scopes, at begin of Def
   //LocalScope = '?';
+  //ExternScope = '>';
   StaticScope = '!';
   //PublicScope = 'p';
 //lists
@@ -2096,9 +2098,12 @@ begin
     symkind := stConst
   else
     symkind := stVar;
+
   declSym := Scope.defSym(symkind, name, getDef, Value); //polymorphic create
   if self.loc.valid then
     declSym.loc := self.loc;
+  declSym.storage := storage;
+
 //no type symbols here, only proc, const, var (global, local, param)
   if (scope = Globals) and (storage <> Kextern) then
   //symbol defined, not only declared?
@@ -2349,8 +2354,14 @@ if False then //better, but should not be required any more
 *)
   if self.storage = Kstatic then begin
     Result := StaticScope + Result;
-  end else if self.storage = Kextern then
+  end
+{$IFDEF __extern}
+   else if (self.storage = Kextern)
+  // and (self.declSym.kind <> stProc) // - sym may be nil here!
+  then
     Result := ExternScope + Result;
+{$ELSE}
+{$ENDIF}
 end;
 
 procedure RType.propagateName(const t: RType);

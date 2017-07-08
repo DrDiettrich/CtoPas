@@ -35,6 +35,10 @@ type
       //currently: according to global flags below (suitable for Pascal)
   protected //parsing meta data
     CurDef: string;
+  {$IFDEF __extern}
+    fExtern: boolean;
+  {$ELSE}
+  {$ENDIF}
     function  ScanDef(const def: string): PChar;
   public
     ModuleName: string;
@@ -386,6 +390,13 @@ begin
   CurDef := def;
   Scanner.SetSource(def);
   Result := PChar(def);
+{$IFDEF __extern}
+  fExtern := Result^ = ExternScope;
+  if fExtern then begin
+    inc(Result);
+  end;
+{$ELSE}
+{$ENDIF}
 end;
 
 procedure TTranslator.Outdent(const s: string);

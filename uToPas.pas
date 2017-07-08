@@ -387,7 +387,6 @@ type
   eSU = (inNone, inStruct, inUnion);
 
 //Delphi translator
-  //TToPas = class(TTranslator)
   TToPas = class(TToPascal)
   private
     procedure WriteInc(const s: string);
@@ -412,11 +411,8 @@ type
     procedure WriteUnion(fIn: eSU);
     procedure WriteUnSigned(fSigned: boolean);
   protected //in file order
-    //ExtName,  //exernal name <extname> - not yet, not explicit?
     ExtLib: string; //for external <libname>
-    //fImpl: boolean; //write implementation?
     curkind: eSymType;  //section: const, var, type, proc
-    //fLibName: boolean;  //translate library, NOT external LibRef
     procedure WriteHeader;  //unit...
     procedure WriteIntf;
     procedure WriteImpl;
@@ -427,7 +423,6 @@ type
       procedure VarSection;
     procedure WriteProcSym;
       procedure WriteParams;
-      //procedure WriteLocal; //(ScanText)
       procedure WriteProcBody;
     procedure WriteTypeSym;
   protected //expressions...
@@ -435,7 +430,6 @@ type
     procedure WriteExpr;
       function  ExpressionString(leftOp: eToken): string;
   protected //from function style translator
-    //s: string;  //strictly temporary string
     typ: TSymType;
     proc: TSymProc;
     sym:  TSymbolC; //from Scanner, on t_sym
@@ -446,7 +440,6 @@ type
     function  skip(t: eToken): boolean;
     procedure InitSrc; override;
   public
-    //function  ToPasLib(mf: TModule): boolean;
     function  Translate: boolean; override;
     function  TranslateSym(ASym: TSymbolC): boolean; override;
   end;
@@ -1579,21 +1572,28 @@ begin
     if fDebugEnums then //debug?
       WriteLn('//' + sym.UniqueName + ' in ' + CurDef);  //skip
   end else begin
-    ConstSection;
+    if sym.storage = Kextern then
+      Write('(*extern const ')
+    else
+      ConstSection;
     Write(sym.UniqueName);
     if (CurDef <> '') and (CurDef <> '#') then begin
     //typed constants
       Write(': ');
       WriteTypePc(inNone);
     end;
-    Write(' = ');
-    if sym.StrVal <> '' then begin
-    //string literal or number?
-      pc := ScanDef(sym.StrVal);  // PChar(sym.StrVal);
-      WriteExprPc;
-    end else
-      Write('0{nil?}');  // sym.IntVal); //, ';');
-    WriteLn(';');
+    if sym.storage = Kextern then begin
+      WriteLn('; *)');
+    end else begin
+      Write(' = ');
+      if sym.StrVal <> '' then begin
+      //string literal or number?
+        pc := ScanDef(sym.StrVal);  // PChar(sym.StrVal);
+        WriteExprPc;
+      end else
+        Write('0{nil?}');  // sym.IntVal); //, ';');
+      WriteLn(';');
+    end;
   end;
 end;
 
