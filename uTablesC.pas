@@ -122,7 +122,8 @@ uses
   uXStrings, uUI,
   uMacros, uScanC, uTokenC;
 
-var
+var //configuratio
+  fCreateProcType: boolean = True;
   fAutoConst: boolean = False;  // True; //convert macros into constants?
   fDebug: boolean = False;  // True; //debug macro output
   fMetaNames: boolean;
@@ -445,8 +446,8 @@ other - local
     function  todo: boolean;
   public
   //scopes
-    mbrScope, //params
-    declScope:  TScope;
+    mbrScope, //params, struct members
+    declScope:  TScope; //where to create sym
     fTempScope: boolean;  //own mbrScope?
   //declaration specifiers
     storage: eStorageClass; //eToken;
@@ -464,7 +465,7 @@ other - local
     nameID:  integer; //scanner symbol ID
     Value: TSymVal;
     basetype: TTypeDef; //if complex type, tagged -> S:<name>, U:<name>, E:<name>
-    declSym: TSymbolC;  //this type, as soon as created
+    declSym: TSymbolC;  //this type(?), as soon as created
     procedure Init;   //~constructor, clear everything
     procedure Reset;  //init declarator, keep specification
     procedure makeTagRef(sue: eKey; const tagname: string);
@@ -474,7 +475,6 @@ other - local
     procedure makeDim(const dim: string);
     procedure makePointer;
     function  qualify(t: eKey; fSpec: boolean): boolean; //const or volatile
-  {$IF __lclScopes}
   //add to mbrScope
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
@@ -483,13 +483,6 @@ other - local
     function  makeVararg: string;
     //procedure makeParams;
     procedure makeParams(const params: string);
-  {$ELSE} //no local scopes
-    procedure makeEnumMember(const n, t, v: string; id: integer);
-    procedure makeStructMember(const t: RType; const bitsize: string);
-    function  makeParam(const Aname, Adef: string): string;
-    function  makeVarargs: string;
-    procedure makeParams(const params: string);
-  {$IFEND}
     procedure finishComplex;
     procedure finishEnum;
     procedure endDecl;  //(fPublic: boolean);
@@ -2021,7 +2014,7 @@ begin
   Kstatic: //ambiguous!
     if (scope = Globals) and (Statics <> nil) then
       scope := Statics;  //what if nil? (header translation???)
-  Ktypedef:
+  Ktypedef: //handle name definition(s) for structured type
   {$IF __delayTags} //means: assign next (typedef'd) name later
     begin //try substitute synthetic name of basetype
       //expect: spec=t{mbrs}, or t:name{mbrs} was already created!
@@ -2090,14 +2083,23 @@ begin
   if (scope = nil) or (declSym <> nil) then
     exit; //assume nothing to create, or done
 
-//now create a polymorphic symbol (very hidden in code)
-//detect procedures how???
-  if (post <> '') and (post[1] = '(') then
-    symkind := stProc
-  else if Kconst in attrs then
+//now create a polymorphic symbol (very hidden in code!)
+  if Kconst in attrs then
     symkind := stConst
   else
     symkind := stVar;
+//detect procedures how???
+  if (post <> '') then begin
+    if (post[1] = '(') then
+      symkind := stProc
+    else if (post[1] = '*') and (post[2] = '(') then begin
+      symkind := stTypedef;
+      if not fCreateProcType and (scope = Globals) then begin
+        exit; //dupe proc?
+        //or create type-template here?
+      end;
+    end;
+  end;
 
   declSym := Scope.defSym(symkind, name, getDef, Value); //polymorphic create
   if self.loc.valid then
@@ -2133,8 +2135,6 @@ But also should distinguish procedures from procedure pointers!
 Since calling conventions can be overridden in VC, they are finished here!
 __inline can be combined with other calling conventions!
 *)
-{$IF __lclScopes}
-//procedure RType.makeParams;
 procedure RType.makeParams(const params: string);
 var
   i: integer;
@@ -2146,7 +2146,9 @@ begin
     post := post + '('; // + params + ')';
     for i := 0 to mbrScope.Count - 1 do begin
       sym := mbrScope.getSym(i);
+    //create concrete (and abstract?) Def
       post := post + sym.TypedName + ListTerm;
+      //def := def + sym.Def + ListTerm;
     end;
     post := post {+ '(' + params} + ')';
   end else
@@ -2169,18 +2171,27 @@ begin
 //handle local scope?
   if (name <> '') and (declsym = nil) then begin
   //declaration or definition{...}?
-    if (self.storage <> Ktypedef) and (i_ttyp <> opBeg) then begin
+    if (self.storage <> Ktypedef) //typedefs require param scope
+    and (i_ttyp <> opBeg) //implementation requires param scope
+    then begin
       storage := Kextern;
       FreeAndNil(mbrScope); //not stored for external procs!
     end;
-    self.endDecl; //should create proc sym
+  (* create (abstract) proctype first, before actual (concrete) proc sym
+    Structured types do this in endDecl() of type Ktypedef -> S:tag
+    Procs must do this explicitly, here? !abstract (untagged) def! -> F:tag?
+    ?is basetype usable for this purpose?
+    !see FinishEnum()!
+  *)
+    self.endDecl; //should create proc sym (and type???)
     if (declSym <> nil) and (mbrScope <> nil)
     and (declSym is TSymProc) then begin  //exclude typedefs?
     //old style declaration/definition - mbrScope typically temporary
       proc := declSym as TSymProc;
       //proc.Params := mbrScope;
       mbrScope.fParentScope := declScope;
-      proc.takeParams(mbrScope);
+      proc.takeParams(mbrScope); //remember for implementation in .Params
+    //check scope now, to debug finished symbol declaration
       assert(declScope <> nil, 'proc without scope');
     end;
   end;
@@ -2258,7 +2269,7 @@ procedure RType.finishEnum;
 var
   i: integer;
   sym: TSymbolC;
-  n: string;
+  n: string; //name of preceding member, for Value
 begin
   if basetype = nil then
     exit; //must have been created, for completeness
@@ -2291,42 +2302,6 @@ begin
     Result.loc := t.loc;
   end;
 end;
-
-{$ELSE} //no __lclScopes
-procedure RType.makeParams(const params: string);
-begin
-  post := post + '(' + params + ')';
-//handle final calling convention (more?)
-  //if self.storage = Kinline then
-  if self._inline then
-    post := post + 'I'; //hint (only)
-  if self.call <> t_empty then begin
-    case call of  //attach to spec or post???
-    Kcdecl:     post := post + 'C';
-    Kfastcall:  post := post + 'F';
-    //Kinline:    post := post + 'I'; //treat as storage class!
-    //Kstdcall: - not flagged
-    end;
-  end;
-//definitely flag declarator as proc/func/pointer?
-end;
-
-function RType.makeParam(const Aname, Adef: string): string;
-begin
-{ TODO : handle old style (name-only) parameters? }
-(* Parameter lists always are parsed from first to last parameter!?
-  Syntax: (<name>:<type>, <name>:<type>, ...)
-*)
-  Result := AName + ':' + Adef + ListTerm;
-  //if Aname <> '' then    Result := Aname + Result;
-end;
-
-function RType.makeVarargs: string;
-begin
-  Result := makeParam('', '~');
-end;
-{$IFEND}
-
 
 function RType.getDef: string;
 begin
