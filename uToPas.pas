@@ -719,8 +719,11 @@ begin //ExpressionString
         poPrefix:
           Result := Result + lhs;
         poInfix: //substitute infix used as pre/postfix/func???
-        //hint: possibly syntax error
-          Result := Result + '{?}(' + lhs + ')'; //syntax-error if no such operator or function!
+        //hint: possibly syntax error if no such operator or function
+          if FALSE then //debug only!
+            Result := Result + '{?}(' + lhs + ')'
+          else
+            Result := Result + '(' + lhs + ')';
         poPostfix:
           Result := lhs + Result;
         end;
@@ -1490,7 +1493,8 @@ var
   esu: char;
   procedure WriteFake;
   begin
-    WriteLn(unQuoteType(typ.ptrname) + ' = ^' + unQuoteType(s) + ';' + ' //forward');
+    if typ.ptrname <> '' then
+      WriteLn(unQuoteType(typ.ptrname) + ' = ^' + unQuoteType(s) + ';' + ' //forward');
   end;
 
 begin
