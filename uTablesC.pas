@@ -820,7 +820,7 @@ begin
     {$ELSE}
     {$ENDIF}
       if (Result.ClassType <> sc) then begin
-        Log('morphing ' + AName, lkTodo); //should never occur!
+        LogBug('morphing ' + AName); //should never occur!
         //Delete(i); - not implemented!
         Result := nil;  //PutObject(nil)?
       end;
@@ -839,7 +839,7 @@ begin
     Result.kind := AKind;
     Result.Def := ADef;
     Result.StrVal := AVal;
-  end else begin
+  end else begin //found compatible sym
   //check
     if (Result.kind <> AKind) and (Result.kind >= low(AKind)) then begin
       //if AKind <> stLocal then begin
@@ -858,7 +858,7 @@ begin
         end;
       end;
       Result.Def := ADef; //always redef
-    end;  //else keep old def?
+    end;  //else must keep old def!
     if AVal <> NoVal then begin
       if (Result.StrVal <> NoVal) and (Result.StrVal <> AVal) then begin
         Log('reval ' + AName, lkTodo);
@@ -1881,14 +1881,16 @@ end;
   Format: <t> [":"<name>] [add later: "{"<def>"}"]
 Called from parser.handleTag
 
-NO TypeSym should be created now, to allow for special member types!
+Problem:
+  NO TypeSym should be created now, to allow for special member types!
+  But when to create the TypeSym else?
 
 Problem: syntax not usable in Pascal type refs (cast...),
   must become proper type sym.
+--> Create (fwd) TypeSym, ref will be modified into *"tname"
 *)
 procedure RType.makeTagRef(sue: eKey; const tagname: string);
 begin
-{$IFnDEF old}
   self.specToken := sue;
   case sue of
   Kenum:    spec := 'E';
@@ -1899,6 +1901,7 @@ begin
   end;
   if tagname <> '' then begin
     spec := spec + ':' + tagname;
+  //checked: existing type is not cleared!
     basetype := Globals.defType(spec, '', nameID); //typename without quotes
     if not loc.valid then begin
     //default location?
@@ -1909,14 +1912,13 @@ begin
     basetype.loc := loc;
     spec := quoteType(spec);  //for further refs: quoted
   end else //debug only?
-{$ELSE}
-  //no sym, cannot modify spec
-{$ENDIF}
     basetype := nil;  //missing???
 end;
 
 procedure RType.makePointer;
 begin
+(* check here for wrong use of param name as proc-type name?
+*)
   pre := '*' + pre;
 end;
 
@@ -1941,6 +1943,7 @@ begin
   char  * const p  //const ptr to string - applies to declarator, not spec!
     (the string can be modified, but not the pointer)
   const char  * const p  //const ptr to const string
+  --> const can occur multiple times, should be recorded???
 *)
   Result := True;
   if t in calling_conventionS then begin
@@ -1953,7 +1956,7 @@ begin
       Log('different calling conventions', lkDebug);
   end else if fSpec then begin //assume spec!
     if t in attrs then
-      exit; //prevent multiple insertion into the spec string.
+      exit; //prevent multiple insertion into the spec string. Really?
     include(attrs, t);
     case t of
     Kconst:     spec := '#' + spec;
@@ -2028,7 +2031,7 @@ begin
     if (specToken in [Kenum, Kstruct, Kunion])
     and (basetype = nil) then
       //create dummy TypeSym below - never reached!
-      name := spec[1] + ':' + IntToStr(Globals.Count)
+      name := spec[1] + ':' + IntToStr(Globals.Count) //never reached?
     else if basetype <> nil then
       exit;
     else if todo then
@@ -2101,6 +2104,7 @@ begin
     end;
   {$ELSE}
     begin
+    //check for proc pointer here???
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
     end;
@@ -2115,6 +2119,8 @@ begin
   else
     symkind := stVar;
 //detect procedures how???
+(* The name is usable with procs, but not with proc types *(...)!
+*)
   if (post <> '') then begin
     if (post[1] = '(') then
       symkind := stProc
@@ -2122,12 +2128,41 @@ begin
       symkind := stTypedef;
       if not fCreateProcType and (scope = Globals) then begin
         exit; //dupe proc?
-        //or create type-template here?
+        //or create proc-template here?
       end;
+    (* create as T:# or T_#?
+      getDef:=post+pre+spec
+        if post is *(...), replace spec by the created type, retain * ?
+        pre empty or * (*v!)
+        spec = result type -> pre+spec!
+    *)
+      //declSym := Globals.defType('T_' + IntToStr(Globals.TypeCount), getDef, 0);
+      spec := post+pre+spec; //retain * in front? or move into pre?
+    {$IFnDEF old} //perfect for translator
+      typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
+    {$ELSE}
+      assert(pre='','unhandled proc type ref');
+      pre := pre + '*';
+      spec := Copy(spec, 2, Length(spec));
+      typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
+    {$ENDIF}
+      basetype := typ;
+      spec := quoteType(basetype.name); //indicate non-basic typeref
+      post := '';
+      pre := '';
+      declSym := typ; //prevent duplicate creation
+    {struct pattern:
+      typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
+      typ.loc := self.loc;
+      basetype := typ;
+      spec := quoteType(basetype.name); //indicate non-basic typeref
+    }
     end;
   end;
 
-  declSym := Scope.defSym(symkind, name, getDef, Value); //polymorphic create
+  if declSym = nil then
+    declSym := Scope.defSym(symkind, name, getDef, Value); //polymorphic create
+  //else proc type?
   if self.loc.valid then
     declSym.loc := self.loc;
   declSym.storage := storage;

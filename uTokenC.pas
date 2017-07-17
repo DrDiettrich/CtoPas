@@ -115,7 +115,7 @@ type
     Klong, Kshort,
   //type modifiers (signedness) "-", "+"
     Ksigned, Kunsigned,
-  //cv-qualifiers  "#", "V"
+  //cv-qualifiers  "#", "R", "V"
     Kconst, Krestrict, Kvolatile, //_Atomic,
   //Windows relevant! "C", "F", "" + "I"=inline
     Kcdecl, Kfastcall, Kstdcall
