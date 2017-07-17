@@ -1024,6 +1024,7 @@ var
     nextToken;
     Result := i_ttyp = t_sym;
     if Result then begin
+    //tag
     {$IFDEF named}
       r.name := ScanText;
       r.nameID := ScanToken.symID;
@@ -1037,7 +1038,7 @@ var
   {$ELSE}
     end else if r.storage = KTypedef then begin
     //create public name??? - delay
-      r.name := IntToStr(Globals.TypeCount);
+      r.name := IntToStr(Globals.TypeCount); //# for tag
       r.nameID := 0;  //todo: substitute typename, if found
       r.loc := ScanSym.loc; //??? preceding key "struct"?
   {$IFEND}

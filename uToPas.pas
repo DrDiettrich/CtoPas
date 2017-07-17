@@ -520,6 +520,8 @@ begin
   stVar:        WriteVarSym;
   stProc:       WriteProcSym;
   stTypedef:    WriteTypeSym;
+  else  //todo
+    beep;
   end;
 end;
 

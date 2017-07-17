@@ -51,13 +51,14 @@ interface
 
 (* delayTags - delay creation of synthetic names for untagged structures?
 Introduced 2006-06
+Turned off 2017, for handling of more anonymous types (procedures!).
 OFF
   Synthetic names and symbols are created immediately.
 ON
   Untagged structures are unnamed until really required.
   The first following typename will become the struct name.
 *)
-const __delayTags = True; //{$DEFINE __delayTags}
+const __delayTags = False; // True; //{$DEFINE __delayTags}
 
 (* extStorage - use extended storage specifiers?
 Introduced 05-2006

@@ -921,12 +921,11 @@ end;
 
 function TTypeDefs.defType(const AName, ADef: string; id: integer): TTypeDef;
 begin
+{$IF __delayTags}
   if (Length(Aname) > 2)
   and (Aname[2] = ':') and (Aname[3] in Digits) then begin
     Log('create dummy: ' +  AName, lkDebug);
   end;
-  TSymbolC(Result) := defSym(stTypedef, AName, ADef);
-{$IF __delayTags}
   //missing id is intentional - shall be set later!
 {$ELSE}
   if (id = 0) then begin
@@ -941,6 +940,7 @@ begin
   //mark as typename?
   end;
 {$IFEND}
+  TSymbolC(Result) := defSym(stTypedef, AName, ADef);
   Result.SetID(id);
 end;
 
@@ -1847,7 +1847,7 @@ end;
 
 function RType.todo: boolean;
 begin
-  Result := false;
+  Result := True; //if todo then exit;
 end;
 
 (* finishComplex - compile specification
@@ -1881,18 +1881,21 @@ end;
   Format: <t> [":"<name>] [add later: "{"<def>"}"]
 Called from parser.handleTag
 
+NO TypeSym should be created now, to allow for special member types!
+
 Problem: syntax not usable in Pascal type refs (cast...),
-  must become proper type sym
+  must become proper type sym.
 *)
 procedure RType.makeTagRef(sue: eKey; const tagname: string);
 begin
+{$IFnDEF old}
   self.specToken := sue;
   case sue of
   Kenum:    spec := 'E';
   Kstruct:  spec := 'S';
   Kunion:   spec := 'U';
   else
-    assert(False, 'bad basetype');
+    assert(False, 'bad basetype'); //bad call
   end;
   if tagname <> '' then begin
     spec := spec + ':' + tagname;
@@ -1906,6 +1909,9 @@ begin
     basetype.loc := loc;
     spec := quoteType(spec);  //for further refs: quoted
   end else //debug only?
+{$ELSE}
+  //no sym, cannot modify spec
+{$ENDIF}
     basetype := nil;  //missing???
 end;
 
@@ -2005,9 +2011,30 @@ begin
 (* The default (top level) scope is Globals?
   C: only "static" is not exported!
 *)
-  if (self.name = '') //anonymous
-  or (declSym <> nil) then //symbol already created
-    exit; //nothing to do?
+(* Special handling (currently) only for untagged structured types:
+  typedef struct {...} name; --> S:name instead of S:#?
+*)
+  if (declSym <> nil) then //symbol already created
+    exit; //all done
+  if (self.name = '') then //not a named item
+{$IF not __delayTags}
+    exit;
+{$ELSE}
+  begin  //anonymous
+    (* may occur with old style parameter lists,
+      or structs without a type or var name (external refs?)
+      struct tag {...}; - not TD, not var
+    *)
+    if (specToken in [Kenum, Kstruct, Kunion])
+    and (basetype = nil) then
+      //create dummy TypeSym below - never reached!
+      name := spec[1] + ':' + IntToStr(Globals.Count)
+    else if basetype <> nil then
+      exit;
+    else if todo then
+      exit;
+  end;
+{$IFEND}
   scope := declScope;
   case storage of
   Kextern:  scope := Globals; //never create in a local scope!
@@ -2021,10 +2048,9 @@ begin
       if basetype = nil then begin
         if (specToken in [Kenum, Kstruct, Kunion])
         and (spec[2] = '{') then begin
-        //untagged struct
+        //untagged struct definition
           if (post = '') then begin //the struct itself
             if (pre = '') then begin
-            //if True ??? - fully unspecified?
               typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
               typ.loc := self.loc;
               basetype := typ;
@@ -2051,7 +2077,7 @@ begin
         end else if getDef = '' then
           LogBug('unknown basetype');
         //else assume valid spec???
-      end; //no basetype defined before
+      end; //else no basetype defined before
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
       declSym.BaseType := self.basetype;
