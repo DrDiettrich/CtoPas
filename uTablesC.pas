@@ -338,9 +338,10 @@ other - local
     function  isType(const AName: string): integer; override;
       //>= 0 (type index) if typename
     function  defType(const AName, ADef: string; id: integer): TTypeDef; override;
+    function  forceType(const ADef: string): TSymType;
     function  getType(const AName: string): TSymType; overload; override;
     function  getType(index: integer): TSymType; overload; override;
-    function  closestType(const ADef: string): string;
+    function  closestType(const ADef: string; forMod: boolean=False): string;
     property  TypeCount: integer read GetCount;
   end;
   TGlobalScope = TTypeDefs;
@@ -1652,9 +1653,10 @@ begin
 {$IFEND}
 end;
 
-function TTypeDefs.closestType(const ADef: string): string;
+function TTypeDefs.closestType(const ADef: string; forMod: boolean): string;
 const
   BaseTypeChars = 'vcwsilLfdD';  //-+"';
+//these names are applicable (only) in modified types (PINT...).
   BaseTypeNames: array[1..10] of string = (
     'VOID', 'CHAR', 'WCHAR', 'SHORT', 'INT', 'LONG', 'LONGLONG',
     'FLOAT', 'DOUBLE', 'EXTENDED'
@@ -1685,34 +1687,190 @@ begin //try find typename - synthesize if required?
   end;
 //check for existing symbol
   if lookup(ADef) then begin
-    Result := sym.name;
+    Result := sym.typename; //best fit
+    if Result = '' then
+      Result := sym.name;
     exit;
   end;
 //check for basetype
   i := Pos(ADef[1], BaseTypeChars);
   if i > 0 then begin
-    Result := BaseTypeNames[i];
+    if forMod then
+      Result := BaseTypeNames[i] //should not be used without modifier!
+    else
+      Result := ''; //means: implied type
     exit;
   end;
 //check modified
   case ADef[1] of
-  '*':  Result := 'P';
-  '#':  Result := 'C';
-  'V':  Result := 'V';
-  else  Result := ''; //fail!
+  '*':  Result := 'P'; //pointer
+  '#':  Result := 'C'; //const
+  'R':  Result := 'R'; //restricted
+  'V':  Result := 'V'; //volatile
+  else  Result := '';  //fail!
   end;
   if Result <> '' then begin
-    post := closestType(copy(ADef, 2, Length(ADef)-1));
+    post := closestType(copy(ADef, 2, Length(ADef)-1), True); //name of basetype
     if post <> '' then begin
       Result := Result + post;
+      if forMod
+      and (Pos(ADef[2], BaseTypeChars) > 0)
+      then begin
+      //create TypeSym, refer to closest TypeSym
+        sym := getType(post);
+        if sym = nil then begin
+          sym := defType(Result, ADef[1]+quoteType(post), Symbols.Add(Result));
+        end;
+      end;
       exit;
     end;
   end;
+//everything failed
+  LogBug('no type found for '+ADef);
+{create type only if really required --> forceType()!!!
 //everything failed, synthesize
   Result := '__T' + IntToStr(Count);
 //create new typedef - add to Symbols
   i := Symbols.Add(Result);
   sym := self.defType(Result, ADef, i);
+}
+end;
+
+(* Create all required types.
+  See Translator.WriteTypePc.
+*)
+function TTypeDefs.forceType(const ADef: string): TSymType;
+var
+  sym, basetype: TSymType absolute Result;
+  tname, basename: string;
+
+const
+  //BasicTypes = '+-DLcdfils'; //basic types handled in WriteType
+  UnhandledTypes = '[~'; //allowed as param types?
+  //UnallowedTypes = bitfieldstart + '';
+
+  function basicType: boolean;
+  const
+    BasicTypes = '+-DLcdfils'; //basic types handled in WriteType
+  begin
+    Result := Pos(ADef[1], BasicTypes) > 0;
+  end;
+
+  function  lookup: boolean;
+  var
+    i: integer;
+  begin
+    for i := 0 to Count - 1 do begin
+      sym := self.getType(i);
+      Result := (sym <> nil) and (sym.Def = ADef);
+      if Result then
+        exit;
+    end;
+    sym := nil; //clear effective Result
+    Result := False;
+  end;
+
+  procedure modType(prefix: char);
+  var
+    symid: integer;
+
+    procedure checkName;
+    var
+      i: integer;
+    begin
+      i := Pos(':', tname);
+      if i > 0 then
+        tname[i] := '_'; //pretty name!
+      symid := Symbols.Add(tname);
+    end;
+
+  begin
+  //recurse to define all basetypes?
+  //get basetype, Adef[2...]
+    basename := closestType(Copy(ADef,2,Length(ADef)), True);
+      //creates intermediate TypeSyms
+    if basename = '' then begin
+    //caused by signed/unsigned...?
+      LogBug('unhandled type ' + ADef);
+      exit; //really?
+    end;
+  //!*"S:tag" --> "PS_tag"
+    basetype := getType(basename); //use if defined
+    if basetype <> nil then begin
+      if basetype.typename <> '' then
+        basename := basetype.typename;
+      if basename[1] = QuoteChar then
+        basename := unQuoteType(basename);
+      tname := prefix + basename; //always unquote???
+      checkName;
+      sym := defType(tname, ADef[1]+quoteType(basename), symid); //modified ref to basetype
+    end else begin
+    //else no basetype sym - ignore? - should have been created!
+    //not created for really basic type, i.e. no INT
+      tname := prefix + tname;
+      checkName;
+      sym := defType(tname, ADef, symid); //full type
+    end;
+  end;
+
+  procedure forcePointer;
+  begin
+    modType('P');
+    if sym = nil then
+      exit; //what?
+    if basetype.ptrname = '' then
+      basetype.ptrname := tname;
+  end;
+
+  procedure forceProcType;
+  begin
+    LogBug('unexpected proc ref ' + ADef);
+  end;
+
+begin
+  Result := nil;
+  if ADef = '' then
+    exit;
+  if basicType then
+    exit;
+  if lookup then
+    exit;
+  case ADef[1] of
+  //BitFieldStart: WriteBitfield;  //"<" or "{"
+  '*':  forcePointer;
+  '(':  forceProcType;
+  typeQuote:  //WriteTypeRef; //string containing valid type name
+    begin
+      Result := getType(ADef);
+      assert(Result <> nil, 'ref undefined typename');
+    end;
+(* basic types handled in ToPas.WriteType
+  '+':  forceUnSigned(False);
+  '-':  forceUnSigned(True);
+  //'<':  WriteBitfield;
+*)
+  '#':  modType('C'); //  forceInc('{const}');
+  'V':  modType('V'); //forceInc('{volatile}'); // inc(pc);  //skip "volatile"
+(*
+  'D':  forceInc('Extended');
+//todo: what's allowed?
+{
+  'E':  WriteEnum;
+  'S':  WriteStruct(fIn);
+  'U':  WriteUnion(fIn);
+}
+  'L':  forceUnSigned(True);  //WriteInc('Int64');
+  'c':  forceInc('Char'); //usually means: Int8, not Char!!!
+  'd':  forceInc('Double');
+  'f':  forceInc('Float');
+  'i':  forceUnSigned(True);  //WriteInc('Integer');
+  'l':  forceUnSigned(True);  //WriteInc('LongInt');
+  's':  forceUnSigned(True);  //WriteInc('SmallInt'); //assume "short" is 16 bit
+  '~':  forceInc('~Array of Const');  //invalid in mixed language projects
+*)
+  else  //break;  //unexpected char, ends current type
+    LogBug('unsupported type: ' + ADef);
+  end;
 end;
 
 { RType }
@@ -2019,25 +2177,10 @@ begin
 *)
   if (declSym <> nil) then //symbol already created
     exit; //all done
-  if (self.name = '') then //not a named item
-{$IF not __delayTags}
+  if (self.name = '') then begin //not a named item
+    //todo; //debug S:tag{}; fixed
     exit;
-{$ELSE}
-  begin  //anonymous
-    (* may occur with old style parameter lists,
-      or structs without a type or var name (external refs?)
-      struct tag {...}; - not TD, not var
-    *)
-    if (specToken in [Kenum, Kstruct, Kunion])
-    and (basetype = nil) then
-      //create dummy TypeSym below - never reached!
-      name := spec[1] + ':' + IntToStr(Globals.Count) //never reached?
-    else if basetype <> nil then
-      exit;
-    else if todo then
-      exit;
   end;
-{$IFEND}
   scope := declScope;
   case storage of
   Kextern:  scope := Globals; //never create in a local scope!
@@ -2138,16 +2281,10 @@ begin
     *)
       //declSym := Globals.defType('T_' + IntToStr(Globals.TypeCount), getDef, 0);
       spec := post+pre+spec; //retain * in front? or move into pre?
-    {$IFnDEF old} //perfect for translator
+    //perfect for translator
       typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
-    {$ELSE}
-      assert(pre='','unhandled proc type ref');
-      pre := pre + '*';
-      spec := Copy(spec, 2, Length(spec));
-      typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
-    {$ENDIF}
-      basetype := typ;
-      spec := quoteType(basetype.name); //indicate non-basic typeref
+      basetype := typ; //okay, force propagate into param sym!?
+      spec := quoteType(basetype.name); //indicate non-basic typeref?
       post := '';
       pre := '';
       declSym := typ; //prevent duplicate creation
@@ -2261,25 +2398,35 @@ end;
 function  RType.makeParam(const t: RType): string;
 var
   sym: TSymbolC;
+  ADef: string;
+  tsym: TTypeDef;
 begin
 (* Parameter lists always are parsed from first to last parameter!?
   Syntax: (<name>:<type>, <name>:<type>, ...)
 *)
-(* Two problems:
+(* problems:
   "void" - indicates *empty* parameter list!
   anonymous parameters - assume external only, ignore!
+  parameter types must be direct type refs (typenames)
 *)
+(* The requested TypeSym is always created,
+  and stored as t.basetype. Same for var/const, if supported?
+  Arrays, bitfields and structured type declarations are not supported.
+*)
+  ADef := t.getDef;
+  //t.basetype := Globals.forceType(ADef); - not if const t!!!
+  tsym := Globals.forceType(ADef); //for ref in output
   //self.symkind := stParam; proc or typedef!!!
   if mbrScope <> nil then begin
   //assume old style declaration
     if t.name = '' then
-      //Log('anonymous parameter', lkTodo)
+      LogBug('anonymous parameter') //bug or handled?
     else begin
-      sym := mbrScope.defSym(stVar, t.name, t.getDef);
+      sym := mbrScope.defSym(stVar, t.name, ADef); // t.getDef);
       sym.loc := t.loc;
     end;
   end;
-  Result := t.name + ':' + t.getDef + ListTerm;
+  Result := t.name + ':' + ADef + ListTerm;
 end;
 
 function RType.makeVararg: string;
@@ -2366,21 +2513,7 @@ end;
 
 function RType.getDef: string;
 begin
-if false then
-  if self.specToken = t_empty then begin
-  //make int type by default - really??? (could stay 'const'?)
-    //specToken := Kconst; ???
-    type_specifier(Kint, True);
-  end;
-//else type stays undefined - check explicitly for (global) procs!
-
   Result := self.post + self.pre + self.spec;
-
-if False then //better, but should not be required any more
-  if Result = '' then begin
-    type_specifier(Kint, True);
-    Result := self.post + self.pre + self.spec;
-  end;
 
 (* static - storage duration or linkage?
   Here we only flag the existence of "static".
@@ -2438,7 +2571,9 @@ begin
   Result := self.Name + '=' + self.Def;
 end;
 
-(* Always quoted typename? Meta type ref IS quoted!
+(* Always quoted typename - Meta type ref IS quoted!
+  fPtr=True implies that *"typename" is acceptable.
+    added for use of ptrname only!
 *)
 function TTypeDef.Ref(fPtr: boolean): string;
 begin
@@ -2468,9 +2603,13 @@ end;
 procedure TTypeDef.Settypename(const Value: string);
 begin
   if (Ftypename = '') and (Pos(':', name) > 1) then begin
+  {$IFDEF old}
     if Globals.getType(Value) = nil then
       LogBug('undefined type') //must create before!
     else
+  {$ELSE}
+    //allow translator to specify names!
+  {$ENDIF}
       Ftypename := quoteType(Value);
   end;
 end;
@@ -2487,9 +2626,13 @@ procedure TTypeDef.Setptrname(const Value: string);
 begin
   if (Fptrname = '') //and (Pos(':', name) > 1)
   then begin
+  {$IFDEF old}
     if Globals.getType(Value) = nil then
       LogBug('undefined type')
     else
+  {$ELSE}
+    //allow translator to specify names!
+  {$ENDIF}
       Fptrname := quoteType(Value);
   end;
 end;

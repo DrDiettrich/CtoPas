@@ -1316,7 +1316,7 @@ begin //S{...}
     if pc^ <> '}' then
       assert(pc^ = '}', 'unterminated struct');
     inc(pc);
-  end else begin //UNDEFINED!!! bug in win???.h, or external declaration?
+  end else begin //UNDEFINED!!! external declaration?
     //WriteLn(f, #9, #9, '//undefined!');
     WriteLn('//undefined!');
   end;
@@ -1326,10 +1326,10 @@ begin //S{...}
     Write('end');
 end;
 
-procedure TToPas.WriteUnion(fIn: eSU);
+procedure TToPas.WriteUnion(fIn: eSUP);
 var
   i, iMbr: integer;
-  nowIn:  eSU;
+  nowIn:  eSUP;
 begin //U{...}
   if pc^ = 'U' then
     inc(pc);  //in declaration ...U{
@@ -1516,10 +1516,11 @@ begin
         //convert tag name reference "t:tag" -> "t_tag"
           s[2] := '_';
           typ.typename := quoteType(s);
-          if typ.ptrname = '' then
-            typ.ptrname := quoteType('P' + s);
-          if (s[1] in ['S','U']) then
-            WriteFake; //show fake pointer before struct/union def
+          if typ.ptrname = '' then begin
+            typ.ptrname := quoteType('P' + s); //fail if not yet defined!
+            if (s[1] in ['S','U']) then
+              WriteFake; //show fake pointer before struct/union def
+          end; //else ptrname shown by ptr type!
         end;
       //now show the struct definition
         Write(unQuoteType(s) + ' = ');
@@ -2511,7 +2512,9 @@ const
     sym := Scope.getSym(i);
   //hide static symbols - also hides all symbols with empty Def!!!
     if (sym.Def <> '') and (sym.Def[1] <> '!') then
-      TranslateSym(sym);
+      TranslateSym(sym)
+    else if sym.kind = stTypedef then //always show structured type
+      TranslateSym(sym)
   end;
 end;
 
