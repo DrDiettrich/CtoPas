@@ -126,8 +126,12 @@ var //configuratio
   fCreateProcType: boolean = True;
   fAutoConst: boolean = False;  // True; //convert macros into constants?
   fDebug: boolean = False;  // True; //debug macro output
+
+//name dispaly requires various modes
+var //use enum?
   fMetaNames: boolean;
     //True during meta-output of procedures (parse body)
+  fUniquNames: boolean;
 
 (* remember library name from WIN...API macros
   for external <lib>
@@ -278,6 +282,7 @@ type
     function  BodyString: string; override;
     property typename: string read Gettypename write Settypename; //if explicitly named, for use in "struct tag" refs
     property ptrname: string read Getptrname write Setptrname; //for use in "struct tag *" refs
+    //function  UniqueName: string; override;
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -554,11 +559,6 @@ const
     ExpTermT = t_empty;
     ExpSep = ',';
   {$ENDIF}
-
-var //currently unused
-(* intended usage: 'T' for Pascal UniqueName of typedef
-*)
-  TypePrefix: string; //= 'T';
 
 implementation
 
@@ -1784,7 +1784,7 @@ const
       symid := Symbols.Add(tname);
     end;
 
-  begin
+  begin //modType
   //recurse to define all basetypes?
   //get basetype, Adef[2...]
     basename := closestType(Copy(ADef,2,Length(ADef)), True);
@@ -1807,7 +1807,8 @@ const
     end else begin
     //else no basetype sym - ignore? - should have been created!
     //not created for really basic type, i.e. no INT
-      tname := prefix + tname;
+      assert(basename <> '', 'missing basename');
+      tname := prefix + basename; // tname;
       checkName;
       sym := defType(tname, ADef, symid); //full type
     end;
@@ -1816,9 +1817,13 @@ const
   procedure forcePointer;
   begin
     modType('P');
-    if sym = nil then
-      exit; //what?
-    if basetype.ptrname = '' then
+    if sym = nil then begin
+      //if todo then
+      LogBug('no type for ptr');
+      modType('P'); //debug
+        exit; //what?
+    end;
+    if (basetype <> nil) and (basetype.ptrname = '') then
       basetype.ptrname := tname;
   end;
 
@@ -2420,7 +2425,7 @@ begin
   if mbrScope <> nil then begin
   //assume old style declaration
     if t.name = '' then
-      LogBug('anonymous parameter') //bug or handled?
+      //LogBug('anonymous parameter') //bug or handled?
     else begin
       sym := mbrScope.defSym(stVar, t.name, ADef); // t.getDef);
       sym.loc := t.loc;
@@ -2747,8 +2752,6 @@ begin
   Result := Name;
   if self.DupeCount > 0 then
     Result := Result + '_' + IntToStr(DupeCount);
-  if (TypePrefix <> '') and (kind = stTypedef) then
-    Result := TypePrefix + Result; //obsolete, Pascal output only: 'T...'
 end;
 
 function TSymbolC.GetName: string;

@@ -904,10 +904,13 @@ begin //WriteArgumentList
       inc(pc);
     end else if (StrLComp(pc, '"va_list"', 9) = 0) then begin
     //what's this good for?
+      LogBug('found va_list');  //assume never occurs!
       ShowVarargs;
       inc(pc, 9);
-    end else
-      WriteTypePc(inNone);
+    end else begin
+    //param types must be simple, or use TypeSym!
+      WriteTypePc(inProc);
+    end;
     if pc^ = ListTerm then
       inc(pc)
     else  //what???
@@ -1003,7 +1006,7 @@ begin
 end;
 
 (* Must return a type name for a possibly complex reference.
-  Should return Symbol?
+  Should return Symbol? --> for UniqueName!!!
   String from type/ptrname is quoted! (typeref)
 
 Currently used for poCast (only), followed by opComma
@@ -1027,6 +1030,9 @@ var
   fPtr: boolean;
   i: integer;
 const
+(* refactor: use Globals.forceType (assume done, here: lookup)
+  use UniqueName of TypeSym!
+*)
   BadResult = '???'; //or empty?
 {$IFDEF old}
   //function makeType: string; - using parent Result!
@@ -1070,6 +1076,7 @@ begin
       end;
     end;
   else
+  //okay if basic type?
     LogBug('unexpected char in type');
     //Result := def; ?
     exit;
@@ -1079,10 +1086,12 @@ begin
 //check for ':'
   i := Pos(':', def);
   tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
+{debug
   if tsym = nil then begin
     //def[i] := '_';
     tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
   end;
+}
   if tsym = nil then begin
     LogBug('how create new type for '+def);
     exit;
@@ -1267,7 +1276,7 @@ begin //E{...}
   end;
 end;
 
-procedure TToPas.WriteStruct(fIn: eSU);
+procedure TToPas.WriteStruct(fIn: eSUP);
 var
   iMbr: integer;  //member count
   //fNamed: boolean;
@@ -1275,6 +1284,7 @@ var
 begin //S{...}
 (* Problem: multiple unions - should retain record..end delimiters!
 *)
+//special case: undefined structs
   if fIn = inUnion then
     WriteLn('{record}')
   else
@@ -1738,6 +1748,30 @@ var
     Write(n + '_1');
   end;
 
+  procedure WriteParamType;
+  var
+    pc0, pe: PChar;
+    def: string;
+    sym: TTypeDef;
+  begin
+  //assume proc and struct types have been substituted!
+    pc0 := pc;
+    while pc^ <> ListTerm do
+      inc(pc);
+    SetString(def, pc0, pc - pc0);
+    sym := Globals.forceType(def);
+    if sym <> nil then begin
+      //todo: sym.UniqueName
+      if sym.typename <> '' then
+        Write(sym.typename)
+      else
+        Write(sym.UniqueName);
+    end else begin
+      pc := pc0;
+      WriteTypePc(inNone);
+    end;
+  end;
+
 begin
   i := 0;
   fVarargs := False;
@@ -1766,12 +1800,16 @@ begin
     if (pc^ = '~') then begin
       ShowVarargs;
       inc(pc);
+  {$IFDEF old}
     end else if (StrLComp(pc, '"va_list"', 9) = 0) then begin
-    //variadic C function ('...') 
+    //variadic C function ('...')
       ShowVarargs;
       inc(pc, 9);
+  {$ELSE}
+  {$ENDIF}
     end else
-      WriteTypePc(inNone);
+      //WriteTypePc(inNone);
+      WriteParamType;
     if pc^ = ListTerm then
       inc(pc)
     else  //what???
