@@ -126,6 +126,8 @@ var //configuratio
   fCreateProcType: boolean = True;
   fAutoConst: boolean = False;  // True; //convert macros into constants?
   fDebug: boolean = False;  // True; //debug macro output
+const
+  fQuoteCasts = True;
 
 //name dispaly requires various modes
 var //use enum?
@@ -344,6 +346,7 @@ other - local
       //>= 0 (type index) if typename
     function  defType(const AName, ADef: string; id: integer): TTypeDef; override;
     function  forceType(const ADef: string): TSymType;
+    function  forceTypeName(const ADef: string): string;
     function  getType(const AName: string): TSymType; overload; override;
     function  getType(index: integer): TSymType; overload; override;
     function  closestType(const ADef: string; forMod: boolean=False): string;
@@ -749,10 +752,19 @@ begin
   Symbols.addKey('inline', Kinline);
 //predefined types
   Globals.Clear;
+  Globals.defType('PVOID', '*v', 0); //void is not valid/special
+  Globals.defType('char', 'c', 0);
+  Globals.defType('int', 'i', 0);
+  Globals.defType('float', 'f', 0);
+  Globals.defType('double', 'd', 0);
   Globals.defType('__int8',  '-1', 0);
   Globals.defType('__int16', '-2', 0);
   Globals.defType('__int32', '-4', 0);
   Globals.defType('__int64', '-8', 0);
+  Globals.defType('__uint8',  '+1', 0);
+  Globals.defType('__uint16', '+2', 0);
+  Globals.defType('__uint32', '+4', 0);
+  Globals.defType('__uint64', '+8', 0);
 end;
 
 { TScope }
@@ -1682,7 +1694,7 @@ var
 begin //try find typename - synthesize if required?
 //check for typeref
   if ADef[1] = TypeQuote then begin
-    Result := copy(ADef, 2, Length(ADef)-2);
+    Result := unQuoteType(ADef); // copy(ADef, 2, Length(ADef)-2);
     exit;
   end;
 //check for existing symbol
@@ -1743,7 +1755,6 @@ function TTypeDefs.forceType(const ADef: string): TSymType;
 var
   sym, basetype: TSymType absolute Result;
   tname, basename: string;
-
 const
   //BasicTypes = '+-DLcdfils'; //basic types handled in WriteType
   UnhandledTypes = '[~'; //allowed as param types?
@@ -1836,13 +1847,17 @@ begin
   Result := nil;
   if ADef = '' then
     exit;
+{basic alias have been created
   if basicType then
-    exit;
+    exit; //?
+}
   if lookup then
     exit;
   case ADef[1] of
   //BitFieldStart: WriteBitfield;  //"<" or "{"
   '*':  forcePointer;
+  '[':
+    Log('unhandled array ref ' + ADef, lkDebug); //handled somewhere else?
   '(':  forceProcType;
   typeQuote:  //WriteTypeRef; //string containing valid type name
     begin
@@ -1875,6 +1890,19 @@ begin
 *)
   else  //break;  //unexpected char, ends current type
     LogBug('unsupported type: ' + ADef);
+  end;
+end;
+
+function TTypeDefs.forceTypeName(const ADef: string): string;
+var
+  sym: TTypeDef;
+begin
+  sym := forceType(ADef);
+  if sym <> nil then
+    Result := sym.Ref(False)
+  else begin
+    LogBug('no type-name');
+    Result := ''; //or what?
   end;
 end;
 

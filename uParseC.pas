@@ -187,7 +187,9 @@ direct-abstract-declarator:
       typ.r.endDecl;  //.type_name()? create (anonymous) typedef
       Result := typ.r.getDef; //.r.basetype.name;  //quote? - not required?
       //Result := TokenNames[opType] {+ '('} + Globals.closestType(Result); // + ')';
-      Result := Globals.closestType(Result);
+      //Result := Globals.closestType(Result);
+      //Result := Globals.closestType(Result);
+      Result := Globals.forceTypeName(Result);
     end else
       Result := '';
   end;
@@ -392,12 +394,18 @@ unary_expression
   begin
     if skip(opLPar) then begin
     //type-name from typedef, or simple, or "*"
+      //sym := Globals.forceType...
       //if True then begin
       if ((i_ttyp = t_sym) and (Globals.isType(ScanText) >= 0))
       or (i_ttyp in cast_specifierS) then begin
-        Result := type_name;
+      //must forceType
+        Result := type_name; //not always quoted?
+        //Result := Globals.forceTypeName(ScanText);
+        if Result = '' then
+          LogBug('no type sym created for cast')
+        else if Result[1] <> typeQuote then
+          logbug('unquoted type');
         expect(opRPar, '(cast")"');
-        //Result := endOp('@(' + Result, cast_expression);  //recursion???
         Result := endOp(TokenNames[opCast] + '(' + Result, cast_expression);  //recursion???
       end else
         Result := postfix_expression(True);

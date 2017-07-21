@@ -780,6 +780,9 @@ begin //ExpressionString
       nextToken;
       expect(opLPar, 'no argument list');  //skip "("
       Result := TypeRefRequired; //at current scan position
+        //bug: unquoted meta type name!
+      if fQuoteCasts then
+        Result := unQuoteType(Result);
       expect(opComma, 'no arg","');
       //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
       Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
@@ -909,7 +912,7 @@ begin //WriteArgumentList
       inc(pc, 9);
     end else begin
     //param types must be simple, or use TypeSym!
-      WriteTypePc(inProc);
+      WriteTypePc(inNone);
     end;
     if pc^ = ListTerm then
       inc(pc)
@@ -1034,20 +1037,6 @@ const
   use UniqueName of TypeSym!
 *)
   BadResult = '???'; //or empty?
-{$IFDEF old}
-  //function makeType: string; - using parent Result!
-  procedure makeType;
-  var
-    sym: TTypeDef;
-  begin
-    assert(tsym <> nil,'missing base type');
-    sym := Globals.defType(Result, def, 0); //synthetic, no altID
-    sym.BaseType := tsym;
-    sym.loc := tsym.loc; //leave undefined?
-  end;
-{$ELSE}
-{$ENDIF}
-
 begin
 //handle type ref
   Result := BadResult; //error indicator
@@ -1085,6 +1074,7 @@ begin
 //now def is the scanned typeref, unquoted
 //check for ':'
   i := Pos(':', def);
+  //forceType?
   tsym := Globals.getType(def); //=basetype? - only for TTypeDef?
 {debug
   if tsym = nil then begin
@@ -1121,7 +1111,9 @@ begin
 {$ELSE}
 {$ENDIF}
 //default: tsym.name or what?
-  Result := tsym.Ref(fPtr); //?
+  Result := tsym.Ref(fPtr); //always quoted!?
+  if not fQuoteCasts then
+    Result := unQuoteType(Result);
   //nextToken; - already past expected type ref
 end;
 
@@ -1276,7 +1268,7 @@ begin //E{...}
   end;
 end;
 
-procedure TToPas.WriteStruct(fIn: eSUP);
+procedure TToPas.WriteStruct(fIn: eSU);
 var
   iMbr: integer;  //member count
   //fNamed: boolean;
@@ -1336,10 +1328,10 @@ begin //S{...}
     Write('end');
 end;
 
-procedure TToPas.WriteUnion(fIn: eSUP);
+procedure TToPas.WriteUnion(fIn: eSU);
 var
   i, iMbr: integer;
-  nowIn:  eSUP;
+  nowIn:  eSU;
 begin //U{...}
   if pc^ = 'U' then
     inc(pc);  //in declaration ...U{
