@@ -2297,7 +2297,7 @@ begin
       end;
     end;
   {$ELSE}
-    begin
+    begin //Ktypedef
     //check for proc pointer here???
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
@@ -2324,7 +2324,7 @@ begin
       end;
     end;
   {$IFEND}
-  end;  //case
+  end;  //case storage
   if (scope = nil) or (declSym <> nil) then
     exit; //assume nothing to create, or done
 

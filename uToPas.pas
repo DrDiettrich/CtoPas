@@ -1151,7 +1151,7 @@ begin //expect quoted typename - unquote
     tsym.typename := quoteType(s); //for later use
   end;
 {$ELSE}
-  s := tsym.ptrName(False); //unquoted
+  s := tsym.typeName(False); //unquoted
 {$ENDIF}
   Write(s);
 end;
