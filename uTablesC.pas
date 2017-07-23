@@ -2282,6 +2282,7 @@ begin
     *)
       if basetype <> nil then begin
       //direct or ptr name?
+      typ := del
         if post <> '' then //can never become typename of basetype
         //type proc: (...)
           //LogBug('handle typedef postfix '+post);
@@ -2300,6 +2301,27 @@ begin
     //check for proc pointer here???
       declSym := Globals.defType(name, getDef, nameID);
       declSym.loc := self.loc;
+      declSym.BaseType := self.basetype;
+    (* propagate defined names into basetype, as typeref (quoted)
+      for use in "struct tag" and "struct tag *" references
+    *)
+      if basetype <> nil then begin
+      //direct or ptr name?
+        typ := declSym as TTypeDef;
+        if post <> '' then //can never become typename of basetype
+        //type proc: (...)
+          //LogBug('handle typedef postfix '+post);
+        else if pre = '' then begin
+          if basetype.TypeSym = nil then
+            basetype.TypeSym := typ;
+        end else if pre = '*' then begin
+          if basetype.PtrSym = nil then //always?
+            basetype.PtrSym := typ
+          else
+            LogBug('retype PtrSym?');
+        end else //assume all other types are used by direct ref to typename!?
+          LogBug('unhandled typedef prefix ' + pre);
+      end;
     end;
   {$IFEND}
   end;  //case

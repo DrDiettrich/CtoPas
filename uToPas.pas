@@ -1521,7 +1521,7 @@ var
   procedure ShowRec(tsym: TTypeDef);
   begin
     s := tsym.typeName(False);
-    if s[2] = ':' then
+    if (Length(s) > 2) and (s[2] = ':') then
       s[2] := '_';
     //if esu in ['S', 'U'] then begin
     if showFwdPtr then begin
@@ -1581,6 +1581,7 @@ begin //WriteTypeSym
     if sym = nil then
       exit;
     typ := sym as TTypeDef;
+    pc := ScanDef(typ.Def); //must be defined, for final checks
 //todo: omit name sym of complex types (typ.basetype.typename=typ.name)
     //if hideSym(typ) then exit; //named struct or defined ptr to struct
     TypeSection; //delay until symbol shown?
@@ -1596,8 +1597,9 @@ begin //WriteTypeSym
         typ := nil;
       end else if (typ.PtrSym = sym)
       and showFwdPtr then
-        exit; //ptr already shown
-      typ := TTypeDef(sym); //revert to current sym
+        exit //ptr already shown
+      else
+        typ := TTypeDef(sym); //revert to current sym
     end;
     if typ <> nil then begin
     //unstructured
