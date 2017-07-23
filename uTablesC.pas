@@ -2357,9 +2357,11 @@ begin
       typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
       basetype := typ; //okay, force propagate into param sym!?
       spec := quoteType(basetype.name); //indicate non-basic typeref?
-      post := '';
+      post := ''; // '*'; //usage: *proc, but creates extra pointer type
       pre := '';
       declSym := typ; //prevent duplicate creation
+    //this fixes proc ptr display
+      typ.PtrSym := typ; //both symbols to same proc type - we are basetype!
     {struct pattern:
       typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
       typ.loc := self.loc;
