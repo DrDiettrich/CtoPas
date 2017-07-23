@@ -1137,6 +1137,7 @@ begin //expect quoted typename - unquote
   s := Unquoted(typeQuote); //ready for lookup by name
   tsym := Globals.getType(s); //either w/o quotes
   assert(tsym <> nil, 'type ref without type');
+{$IFDEF __typenames}
 //better use namesym and show its unique name?
   if (tsym.typename <> '') then begin
     //UniqueName(s)
@@ -1149,6 +1150,9 @@ begin //expect quoted typename - unquote
     s[i] := '_';
     tsym.typename := quoteType(s); //for later use
   end;
+{$ELSE}
+  s := tsym.ptrName(False); //unquoted
+{$ENDIF}
   Write(s);
 end;
 
@@ -1491,70 +1495,127 @@ end;
 
   Proc types???
 *)
+(* Try t/p SYM, allow override if name like "S_", "PS_"
+  S:tag - show only if no tsym exist, also show psym before
+  *S: - do not create, show fake if required
+  tsym: show def if s.tsym=self
+  psym: hide, show always before S:
+*)
 procedure TToPas.WriteTypeSym;
 var
-  s, n: string;
+  s: string;
   esu: char;
+
   procedure WriteFake;
   begin
-    if typ.ptrname <> '' then
-      WriteLn(unQuoteType(typ.ptrname) + ' = ^' + unQuoteType(s) + ';' + ' //forward');
+    //WriteLn(unQuoteType(typ.ptrname) + ' = ^' + unQuoteType(s) + ';' + ' //forward');
+    WriteLn('P'+s + ' = ^' + s + ';' + ' //forward');
   end;
 
-begin
+  function showFwdPtr: boolean;
+  begin
+    Result := esu in ['S', 'U'];
+  end;
+
+//show pointer and record definition
+  procedure ShowRec(tsym: TTypeDef);
+  begin
+    s := tsym.typeName(False);
+    if s[2] = ':' then
+      s[2] := '_';
+    //if esu in ['S', 'U'] then begin
+    if showFwdPtr then begin
+    //always show ptr
+      if tsym.PtrSym = nil then
+      //WriteFake
+        WriteLn('P'+s + ' = ^' + s + ';' + ' //forward')
+      else
+        WriteLn(tsym.ptrName(False) + ' = ^' + s + ';');
+    end; //else no (fake) ptr here!
+  //show record or enum
+    sym := tsym; //to be shown, possibly instead of name sym
+    pc := ScanDef(tsym.Def); //if required later
+    Write(s + ' = ');
+    case esu of
+    'E':  WriteEnum;
+    'S':  WriteStruct(inNone);
+    'U':  WriteUnion(inNone);
+    else  assert(False, 'expected S/U/E');
+    end;
+  end;
+
+  function isStructured(tsym: TTypeDef): boolean;
+  begin
+    Result := False;
+    if tsym = nil then
+      exit; //not a sym
+    s := tsym.name;
+    Result := (Length(s) > 2) and (s[2] = ':');
+    if not Result then
+      exit;
+    esu := s[1];
+    s[2] := '_'; //pretty default name
+  end;
+
+{$IFDEF new}
+  function hideSym(tsym: TTypeDef): boolean;
+  var
+    basetype: TTypeDef;
+  begin
+    Result := tsym = nil;
+    if Result then
+      exit; //not a sym
+    if isStructured(tsym) then begin
+      Result := tsym.TypeSym <> nil; //has defined name sym
+      exit;
+    end;
+    basetype := tsym.BaseType;
+    Result := isStructured(basetype)
+      and (basetype.PtrSym = tsym); //ptr to structured type
+  end;
+{$ELSE}
+{$ENDIF}
+
+begin //WriteTypeSym
   try
+    if sym = nil then
+      exit;
     typ := sym as TTypeDef;
 //todo: omit name sym of complex types (typ.basetype.typename=typ.name)
-    if typ <> nil then begin
-      TypeSection;
-      s := typ.Name; //unquoted?
-      pc := ScanDef(typ.Def);
-      if (Length(s) > 2) and (s[2] = ':') then begin
-      //struct type
-        esu := s[1];
-        if typ.typename <> '' then
-          s := typ.typename //quoted??? yes, for meta output!
-        else begin
-        //convert tag name reference "t:tag" -> "t_tag"
-          s[2] := '_';
-          typ.typename := quoteType(s);
-          if typ.ptrname = '' then begin
-            typ.ptrname := quoteType('P' + s); //fail if not yet defined!
-            if (s[1] in ['S','U']) then
-              WriteFake; //show fake pointer before struct/union def
-          end; //else ptrname shown by ptr type!
-        end;
-      //now show the struct definition
-        Write(unQuoteType(s) + ' = ');
-        case esu of
-        'E':  WriteEnum;
-        'S':  WriteStruct(inNone);
-        'U':  WriteUnion(inNone);
-        else  assert(False, 'expected S/U/E');
-        end;
-      end else begin
-      //simple type, or anon struct?
-      //todo: omit t=t !!!
-        if (typ.BaseType <> nil) then begin
-          n := quoteType(typ.name);
-          if (n = typ.BaseType.typename)
-          //or (n = typ.BaseType.ptrname) //if assigned while writing fake?
-          then //!fwd only S/U!
-            Write('//'); // exit; //already shown as name of basetype?
-        end;
-        Write(s + ' = ');
-        WriteTypePc(inNone); //type def, ^t valid (never convert!)
-        if pc^ <> #0 then begin
-        //not everything converted
-          s := string(pc);
-          if s = 'v' then
-            Write('record {undefined} end') //really?
-          else
-            Write(' ??? ' + string(pc) + ' ???');
-        end;
-      end;
-      WriteLn(';');
+    //if hideSym(typ) then exit; //named struct or defined ptr to struct
+    TypeSection; //delay until symbol shown?
+    if isStructured(typ) then begin
+      if typ.TypeSym <> nil then
+        exit; //show with TypeSym
+      ShowRec(typ);
+      typ := nil; //flag shown
+    end else if isStructured(typ.BaseType) then begin
+      typ := typ.BaseType;
+      if typ.TypeSym = sym then begin
+        ShowRec(typ); //show it now
+        typ := nil;
+      end else if (typ.PtrSym = sym)
+      and showFwdPtr then
+        exit; //ptr already shown
+      typ := TTypeDef(sym); //revert to current sym
     end;
+    if typ <> nil then begin
+    //unstructured
+      s := typ.typeName(False); //unquoted
+      Write(s + ' = ');
+      pc := ScanDef(typ.Def);
+      WriteTypePc(inNone); //type def, ^t valid (never convert!)
+    end;
+  //type shown, completely?
+    if pc^ <> #0 then begin
+    //not everything converted
+      s := string(pc);
+      if s = 'v' then
+        Write('record {undefined} end') //really?
+      else
+        Write(' ??? ' + string(pc) + ' ???');
+    end;
+    WriteLn(';');
   except
     WriteLn('???' + string(pc) + '???');
   end;
@@ -1753,11 +1814,15 @@ var
     SetString(def, pc0, pc - pc0);
     sym := Globals.forceType(def);
     if sym <> nil then begin
+    {$IFDEF __typenames}
       //todo: sym.UniqueName
       if sym.typename <> '' then
-        Write(sym.typename)
+        Write(sym.typename(False)   always!
       else
         Write(sym.UniqueName);
+    {$ELSE}
+      Write(sym.typename(False));
+    {$ENDIF}
     end else begin
       pc := pc0;
       WriteTypePc(inNone);

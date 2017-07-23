@@ -266,6 +266,7 @@ type
 {$IFEND}
 
   TTypeDef = class(TSymbolC)
+  {$IFDEF __typenames}
   private
     Ftypename: string;
     Fptrname: string;
@@ -273,6 +274,8 @@ type
     procedure Settypename(const Value: string);
     function Getptrname: string;
     function Gettypename: string;
+  {$ELSE}
+  {$ENDIF}
   protected
     function  GetCaption: string; override;
   public
@@ -282,9 +285,16 @@ type
     //property  Def: string read StrVal write StrVal;
     //property  toString: string read GetCaption;
     function  BodyString: string; override;
+  {$IFDEF __typenames}
     property typename: string read Gettypename write Settypename; //if explicitly named, for use in "struct tag" refs
     property ptrname: string read Getptrname write Setptrname; //for use in "struct tag *" refs
     //function  UniqueName: string; override;
+  {$ELSE}
+  public
+    TypeSym, PtrSym: TTypeDef;
+    function ptrName(fQuoted: boolean=true): string;
+    function typeName(fQuoted: boolean=true): string;
+  {$ENDIF}
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -1815,6 +1825,7 @@ const
       tname := prefix + basename; //always unquote???
       checkName;
       sym := defType(tname, ADef[1]+quoteType(basename), symid); //modified ref to basetype
+      sym.BaseType := basetype;
     end else begin
     //else no basetype sym - ignore? - should have been created!
     //not created for really basic type, i.e. no INT
@@ -1834,8 +1845,14 @@ const
       modType('P'); //debug
         exit; //what?
     end;
+  {$IFDEF __typenames}
     if (basetype <> nil) and (basetype.ptrname = '') then
       basetype.ptrname := tname;
+  {$ELSE}
+  //can always override ptrsym? (last assign from typedef wins)
+    if (basetype <> nil) and (basetype.PtrSym = nil) then
+      basetype.PtrSym := sym;
+  {$ENDIF}
   end;
 
   procedure forceProcType;
@@ -2630,6 +2647,7 @@ begin
   end;
 end;
 
+{$IFDEF __typenames}
 (* Only name structured types, to get rid of ':'.
   Don't rename, if explicitly set
 *)
@@ -2647,14 +2665,6 @@ begin
   end;
 end;
 
-function TTypeDef.Gettypename: string;
-begin
-  Result := Ftypename;
-  //if Result <> '' then
-    exit;
-  Result := name;
-end;
-
 procedure TTypeDef.Setptrname(const Value: string);
 begin
   if (Fptrname = '') //and (Pos(':', name) > 1)
@@ -2670,6 +2680,14 @@ begin
   end;
 end;
 
+function TTypeDef.Gettypename: string;
+begin
+  Result := Ftypename;
+  //if Result <> '' then
+    exit;
+  Result := name;
+end;
+
 function TTypeDef.Getptrname: string;
 begin
   Result := Fptrname;
@@ -2677,6 +2695,31 @@ begin
     exit;
   Result := '*'+quoteType(name); //??? :?
 end;
+{$ELSE}
+
+(* names from type syms
+*)
+function TTypeDef.typeName(fQuoted: boolean=true): string;
+begin
+  if TypeSym <> nil then
+    result := TypeSym.name
+  else
+    Result := name;
+  if fQuoted then
+    Result := quoteType(Result); //param?
+end;
+
+function TTypeDef.ptrName(fQuoted: boolean): string;
+begin
+  if PtrSym <> nil then
+    Result := PtrSym.name
+  else
+    Result := 'P' + typeName(False); //really synthetic ptr name?
+  if fQuoted then
+    Result := quoteType(Result); //param?
+end;
+
+{$ENDIF}
 
 { TSymbolC }
 
