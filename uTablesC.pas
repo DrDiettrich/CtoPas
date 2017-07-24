@@ -126,6 +126,7 @@ var //configuratio
   fCreateProcType: boolean = True;
   fAutoConst: boolean = False;  // True; //convert macros into constants?
   fDebug: boolean = False;  // True; //debug macro output
+  __refToBase: boolean = True;
 const
   fQuoteCasts = True;
 
@@ -1838,8 +1839,10 @@ var
     end;
     basename := basetype.typename(False);
     tname := prefix + basename; //always unquote???
-    checkName(ADef[1]+quoteType(basename));
-    //sym := defType(tname, ADef[1]+quoteType(basename), symid); //modified ref to basetype
+    if __refToBase then
+      checkName(ADef[1]+quoteType(basename))
+    else
+      checkName(ADef);
     sym.BaseType := basetype;
   end;
 

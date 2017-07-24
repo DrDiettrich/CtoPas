@@ -132,6 +132,7 @@ type
     procedure JmpNext;
     procedure JmpSym;
   public
+    t0: TDateTime;
     //MainFile: string;
     FileID: integer;
     CurFile:  TFile;
@@ -140,6 +141,8 @@ type
     Links:  TObjectList;
     iLink:  integer;
     procedure ShowLocs(const r: TFileLocs);
+    procedure StartTime;
+    procedure EndTime;
   end;
 
 var
@@ -336,6 +339,7 @@ end;
 
 procedure TScanLog.TestParse(const StartFile: string);
 begin
+  StartTime;
   Screen.Cursor := crHourGlass;
   FileID := -1;
   fAbort := False;
@@ -350,6 +354,7 @@ begin
   //Globals.SaveToFile(ChangeFileExt(StartFile, '.txt'));
   //Statics.Save...ToFile(ChangeFileExt(StartFile, '.txt'));
   Modules.Save;
+  EndTime;
   Screen.Cursor := crDefault;
 end;
 
@@ -431,6 +436,7 @@ procedure TScanLog.LoadTest1Click(Sender: TObject);
 var
   s: string;
 begin
+  StartTime;
   Screen.Cursor := crHourGlass;
   s := ChangeFileExt(MainFile, '.txt');
   while not FileExists(s) do begin
@@ -448,6 +454,7 @@ begin
 {$ENDIF}
   uToPas.ToPas(MainFile);
   self.LogMsg('Conversion finished', lkProgress);
+  EndTime;
   Screen.Cursor := crDefault;
 end;
 
@@ -738,6 +745,28 @@ begin
   udLinks.Position := Links.Count;
   JmpNext;
   //self.ShowLoc(sym.loc);
+end;
+
+procedure TScanLog.EndTime;
+var
+  dt: TDateTime;
+  s: string;
+  i: integer;
+begin
+  dt := now-t0; //timediff in days
+  dt := dt * 24 * 60 * 60; //in seconds
+  str(dt:2:3, s);
+  self.LogMsg('in '+s, lkProgress);
+
+  //scroll into view
+  i := lbMsg.Items.Count - 5;
+  if i > 0 then
+    lbMsg.TopIndex := i;
+end;
+
+procedure TScanLog.StartTime;
+begin
+  t0 := now;
 end;
 
 { TSyntaxPainter }
