@@ -183,13 +183,12 @@ direct-abstract-declarator:
       typ.r.specToken := Ktypedef;  //fake typedef!
       //typ.r.symkind := stTypedef; - initialized or unused
       typ.declarator;
-      { TODO : lookup or create anonymous typename }
       typ.r.endDecl;  //.type_name()? create (anonymous) typedef
       Result := typ.r.getDef; //.r.basetype.name;  //quote? - not required?
       //Result := TokenNames[opType] {+ '('} + Globals.closestType(Result); // + ')';
       //Result := Globals.closestType(Result);
       //Result := Globals.closestType(Result);
-      Result := Globals.forceTypeName(Result);
+      Result := Globals.forceTypeName(Result); //based on forceType
     end else
       Result := '';
   end;

@@ -1170,6 +1170,7 @@ Problems:
     #define _CHAR_UNSIGNED  1 --> default char IS unsigned (+)
     PSZ=*c means String Zeroterminated -> ^Char
     _lower=[]+c means Array of Char?
+    "L" means Int64, signed or unsigned!???
 
 Workaround: assume c=Char, unless prefixed by un/signed
 *)
@@ -1210,7 +1211,7 @@ begin
       dec(pc);  //inc after switch
     end;
   '1','2','4','8': WriteSized(fSigned, pc^);
-  'L':  Write(acSigned[fSigned] + 'Int8');
+  'L':  Write(acSigned[fSigned] + 'Int8'); //LONGLONG??? unsigned by default!?
   'c':  Write('Char'); //if no signedness specified
 //use Delphi standard types
   'i':  Write(asInt[fSigned]);  // Write(acSigned[fSigned] + 'Int');
@@ -1218,7 +1219,6 @@ begin
   's':  Write(asShort[fSigned]);// Write(acSigned[fSigned] + 'Short');
   else
     Write(asSigned[fSigned]);
-    //bug in D4: "exit" in "case" is not always compiled properly!
     dec(pc);  //exit; //don't inc pc!
   end;
   inc(pc);
@@ -1814,7 +1814,7 @@ var
     while pc^ <> ListTerm do
       inc(pc);
     SetString(def, pc0, pc - pc0);
-    sym := Globals.forceType(def);
+    sym := Globals.forceParamType(def);
     if sym <> nil then begin
     {$IFDEF __typenames}
       //todo: sym.UniqueName
