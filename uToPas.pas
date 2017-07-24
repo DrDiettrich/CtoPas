@@ -660,6 +660,7 @@ function  TToPas.ExpressionString(leftOp: eToken): string;
 var
   op: eToken;
   lhs, rhs: string;
+  fArgList: boolean;
   //s: string absolute Result;
 begin //ExpressionString
 //i_ttyp is the current token - literal or operator?
@@ -705,13 +706,20 @@ begin //ExpressionString
     begin
       op := i_ttyp; nextToken;  //.nextRaw;  //why raw?
       Result := aPasOp[op].n;
-      expect(opLPar, 'no operand list');
-      lhs := ExpressionString(op);
-      if skip(opComma) then begin
-        rhs := ExpressionString(op);
-        Result := lhs + Result + rhs;
-      end else begin
+    //+- num?
+      fArgList := skip(opLPar);
+      if fArgList then begin
+        //expect(opLPar, 'no operand list');
+        lhs := ExpressionString(op);
+        if skip(opComma) then begin
+          rhs := ExpressionString(op);
+          Result := lhs + Result + rhs;
+        end;
+        expect(opRPar, 'no op(...")"'); //always paired!
+      end else
+        lhs := ExpressionString(op);
         //rhs := '';
+      if not fArgList then begin
       //special conversion: binop as monop!
         if (aPasOp[op].t = poInfix) and (aPasOp[op].m > t_empty) then begin
           op := aPasOp[op].m; //substitute by indicated monop
@@ -730,7 +738,6 @@ begin //ExpressionString
           Result := lhs + Result;
         end;
       end;
-      expect(opRPar, 'no op(...")"');
       if aPasOp[op].p < aPasOp[leftOp].p then
         Result := '(' + Result + ')';
     end;
@@ -784,6 +791,7 @@ begin //ExpressionString
       if fQuoteCasts then
         Result := unQuoteType(Result);
       expect(opComma, 'no arg","');
+    //todo: bad nested {} in enum value {={as}...
       //Result := Result + '{as}(' + ExpressionString(t_empty) + ')';
       Result := '{as}' + Result + '(' + ExpressionString(t_empty) + ')';
       expect(opRPar, 'no arg")"');
