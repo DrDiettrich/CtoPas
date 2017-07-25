@@ -404,7 +404,11 @@ type
     procedure WriteExprPc;
     procedure WritePointer;
     procedure WriteProcType;
+    {$IFDEF old}
       procedure WriteArgumentList;
+    {$ELSE}
+      //WriteParams
+    {$ENDIF}
     procedure WriteSized(fSigned: boolean; len: char);
     procedure WriteStruct(fIn: eSU);
     procedure WriteTypePc(fIn: eSU);
@@ -847,6 +851,7 @@ begin //"["
   inc(pc);  //skip ']'
 end;
 
+{$IFDEF old}
 procedure TToPas.WriteArgumentList;
 var
   i: integer; //argument counter, for naming anonymous arguments
@@ -918,9 +923,10 @@ begin //WriteArgumentList
       LogBug('found va_list');  //assume never occurs!
       ShowVarargs;
       inc(pc, 9);
-    end else begin
+    end else begin  //see WriteParams
     //param types must be simple, or use TypeSym!
       WriteTypePc(inNone);
+      WriteParamType; //?
     end;
     if pc^ = ListTerm then
       inc(pc)
@@ -960,6 +966,8 @@ begin //WriteArgumentList
   if ci then
     Write(' {inline}'); //doesn't make sense for imported (API...) procedures
 end;
+{$ELSE}
+{$ENDIF}
 
 procedure TToPas.WriteProcType;
 var
@@ -986,7 +994,11 @@ begin
   else
     Write('function(');
 //argument list
+{$IFDEF old}
   WriteArgumentList;
+{$ELSE}
+  WriteParams;
+{$ENDIF}
 end;
 
 procedure TToPas.WritePointer;
@@ -1839,7 +1851,7 @@ var
     end;
   end;
 
-begin
+begin //WriteParams - identical to WriteArgumentList!!!
   i := 0;
   fVarargs := False;
   while pc^ <> ')' do begin
