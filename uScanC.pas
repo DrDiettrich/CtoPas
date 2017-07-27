@@ -33,7 +33,7 @@ const
   fWarnRedef = False;
 var
   fVerbose: boolean = False;  //log source lines? (nextLine)
-  fLogLines: boolean = True;  //log non-preprocessor lines? (nextTokenC)
+  fLogLines: boolean = False; // True;  //log non-preprocessor lines? (nextTokenC)
   fWantRems: boolean = False; //show comments? (otherwise as empty strings)
   //OnLineChange: TLineCallback; - see below!
 

@@ -126,11 +126,11 @@ var //configuratio
   fCreateProcType: boolean = True;
   fAutoConst: boolean = False;  // True; //convert macros into constants?
   fDebug: boolean = False;  // True; //debug macro output
-  __refToBase: boolean = True;
 const
   fQuoteCasts = True;
+  __refToBase = False; //canonic!
 
-//name dispaly requires various modes
+//name display requires various modes
 var //use enum?
   fMetaNames: boolean;
     //True during meta-output of procedures (parse body)
@@ -228,7 +228,7 @@ type
       //questionable!
   public
     kind: eSymType;
-    DupeCount:  byte; //determined when added to dupe list
+    DupeCount: Shortint; //signed  byte; //determined when added to dupe list
       //intended purpose: substitution of conflicting names
     ScopeNum:   byte;  //byte should be sufficient?
     storage: eStorageClass; //extern!?
@@ -267,16 +267,6 @@ type
 {$IFEND}
 
   TTypeDef = class(TSymbolC)
-  {$IFDEF __typenames}
-  private
-    Ftypename: string;
-    Fptrname: string;
-    procedure Setptrname(const Value: string);
-    procedure Settypename(const Value: string);
-    function Getptrname: string;
-    function Gettypename: string;
-  {$ELSE}
-  {$ENDIF}
   protected
     function  GetCaption: string; override;
   public
@@ -286,16 +276,11 @@ type
     //property  Def: string read StrVal write StrVal;
     //property  toString: string read GetCaption;
     function  BodyString: string; override;
-  {$IFDEF __typenames}
-    property typename: string read Gettypename write Settypename; //if explicitly named, for use in "struct tag" refs
-    property ptrname: string read Getptrname write Setptrname; //for use in "struct tag *" refs
-    //function  UniqueName: string; override;
-  {$ELSE}
+    function  UniqueName: string; override;
   public
     TypeSym, PtrSym: TTypeDef;
     function ptrName(fQuoted: boolean=true): string;
     function typeName(fQuoted: boolean=true): string;
-  {$ENDIF}
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -461,6 +446,7 @@ other - local
 
 (* Manage type declarations, as strings.
 *)
+  PRType = ^RType;
   RType = object
   protected
     procedure handleStorage;
@@ -500,7 +486,7 @@ other - local
     procedure makeScope;
     function  makeEnumMember(const t: RType): TSymbolC;
     function  makeStructMember(const t: RType): TSymbolC;
-    function  makeParam(const t: RType): string;
+    function  makeParam(var t: RType): string;
     function  makeVararg: string;
     //procedure makeParams;
     procedure makeParams(const params: string);
@@ -514,6 +500,7 @@ other - local
 
 const
   MemberScope = Ktypedef;
+  //MaxDupe = high(shortint); //127; // high(TSymbolC.DupeCount);
 
 function  quoteName(const Aname: string): string;
 function  quoteType(const Aname: string): string;
@@ -957,13 +944,6 @@ end;
 
 function TTypeDefs.defType(const AName, ADef: string; id: integer): TTypeDef;
 begin
-{$IF __delayTags}
-  if (Length(Aname) > 2)
-  and (Aname[2] = ':') and (Aname[3] in Digits) then begin
-    Log('create dummy: ' +  AName, lkDebug);
-  end;
-  //missing id is intentional - shall be set later!
-{$ELSE}
   if (id = 0) then begin
   //debug: ref to Symbols[]?
   //intentional (created later?) or simply forgotten?
@@ -975,7 +955,6 @@ begin
   end else begin
   //mark as typename?
   end;
-{$IFEND}
   TSymbolC(Result) := defSym(stTypedef, AName, ADef);
   Result.SetID(id);
 end;
@@ -2289,65 +2268,6 @@ begin
     if (scope = Globals) and (Statics <> nil) then
       scope := Statics;  //what if nil? (header translation???)
   Ktypedef: //handle name definition(s) for structured type
-  {$IF __delayTags} //means: assign next (typedef'd) name later
-    begin //try substitute synthetic name of basetype
-      //expect: spec=t{mbrs}, or t:name{mbrs} was already created!
-      if basetype = nil then begin
-        if (specToken in [Kenum, Kstruct, Kunion])
-        and (spec[2] = '{') then begin
-        //untagged struct definition
-          if (post = '') then begin //the struct itself
-            if (pre = '') then begin
-              typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
-              typ.loc := self.loc;
-              basetype := typ;
-              spec := quoteType(basetype.name); //indicate non-basic typeref
-            //finish enums? - problem: mbrScope cleared before decl spec!
-              if spectoken = Kenum then begin
-                finishEnum;
-              end;
-            //flag defined typename in basetype!?
-              //basetype.typename := name; //to be used in ref <- struct tag
-            end else if pre = '*' then
-              //handled below
-            else begin
-            //requires synthetic name, for what?
-              todo(); //reached when?
-            end;
-          end //post=''
-        end else if (spec = '') then begin
-        //more cases!!!
-          self.type_specifier(Kint, True);  //???
-        end else if self.specToken = t_empty then begin
-          log('spec?', lkDebug);
-          self.type_specifier(Kint, True);  //???
-        end else if getDef = '' then
-          LogBug('unknown basetype');
-        //else assume valid spec???
-      end; //else no basetype defined before
-      declSym := Globals.defType(name, getDef, nameID);
-      declSym.loc := self.loc;
-      declSym.BaseType := self.basetype;
-    (* propagate defined names into basetype, as typeref (quoted)
-      for use in "struct tag" and "struct tag *" references
-    *)
-      if basetype <> nil then begin
-      //direct or ptr name?
-      typ := del
-        if post <> '' then //can never become typename of basetype
-        //type proc: (...)
-          //LogBug('handle typedef postfix '+post);
-        else if pre = '' then begin
-          if basetype.typename = '' then
-            basetype.typename := quoteType(name);
-        end else if pre = '*' then begin
-          if basetype.ptrname = '' then
-            basetype.ptrname := quoteType(name)
-        end else //assume all other types are used by direct ref to typename!?
-          LogBug('unhandled typedef prefix ' + pre);
-      end;
-    end;
-  {$ELSE}
     begin //Ktypedef
     //check for proc pointer here???
       declSym := Globals.defType(name, getDef, nameID);
@@ -2374,7 +2294,6 @@ begin
           LogBug('unhandled typedef prefix ' + pre);
       end;
     end;
-  {$IFEND}
   end;  //case storage
   if (scope = nil) or (declSym <> nil) then
     exit; //assume nothing to create, or done
@@ -2520,7 +2439,7 @@ begin
   end;
 end;
 
-function  RType.makeParam(const t: RType): string;
+function  RType.makeParam(var t: RType): string;
 var
   sym: TSymbolC;
   ADef: string;
@@ -2539,8 +2458,8 @@ begin
   Arrays, bitfields and structured type declarations are not supported.
 *)
   ADef := t.getDef;
-  //t.basetype := Globals.forceParamType(ADef); - not if const t!!!
-  tsym := Globals.forceParamType(ADef); //for ref in output
+  t.basetype := Globals.forceParamType(ADef); //- not if const t!!!
+  //tsym := Globals.forceParamType(ADef); //for ref in output
   //self.symkind := stParam; proc or typedef!!!
   if mbrScope <> nil then begin
   //assume old style declaration
@@ -2549,6 +2468,7 @@ begin
     else begin
       sym := mbrScope.defSym(stVar, t.name, ADef); // t.getDef);
       sym.loc := t.loc;
+      sym.BaseType := tsym; //if ever used
     end;
   end;
   Result := t.name + ':' + ADef + ListTerm;
@@ -2588,7 +2508,7 @@ begin
     mbrScope.AddObject(t.name, Result);
 //handle ID
   if t.nameID = 0 then
-    Log('no nameID', lkBug)
+    LogBug('no nameID')
   else begin
     //Result.SetID(id);
     Result.altID := t.nameID; //local, no backref!???
@@ -2722,56 +2642,6 @@ begin
   end;
 end;
 
-{$IFDEF __typenames}
-(* Only name structured types, to get rid of ':'.
-  Don't rename, if explicitly set
-*)
-procedure TTypeDef.Settypename(const Value: string);
-begin
-  if (Ftypename = '') and (Pos(':', name) > 1) then begin
-  {$IFDEF old}
-    if Globals.getType(Value) = nil then
-      LogBug('undefined type') //must create before!
-    else
-  {$ELSE}
-    //allow translator to specify names!
-  {$ENDIF}
-      Ftypename := quoteType(Value);
-  end;
-end;
-
-procedure TTypeDef.Setptrname(const Value: string);
-begin
-  if (Fptrname = '') //and (Pos(':', name) > 1)
-  then begin
-  {$IFDEF old}
-    if Globals.getType(Value) = nil then
-      LogBug('undefined type')
-    else
-  {$ELSE}
-    //allow translator to specify names!
-  {$ENDIF}
-      Fptrname := quoteType(Value);
-  end;
-end;
-
-function TTypeDef.Gettypename: string;
-begin
-  Result := Ftypename;
-  //if Result <> '' then
-    exit;
-  Result := name;
-end;
-
-function TTypeDef.Getptrname: string;
-begin
-  Result := Fptrname;
-  //if Result <> '' then
-    exit;
-  Result := '*'+quoteType(name); //??? :?
-end;
-{$ELSE}
-
 (* names from type syms
 *)
 function TTypeDef.typeName(fQuoted: boolean=true): string;
@@ -2794,7 +2664,12 @@ begin
     Result := quoteType(Result); //param?
 end;
 
-{$ENDIF}
+function TTypeDef.UniqueName: string;
+begin
+  Result := typeName(False);
+  if DupeCount > 0 then
+    Result := Result + '_' + IntToStr(DupeCount);
+end;
 
 { TSymbolC }
 

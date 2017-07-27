@@ -508,9 +508,11 @@ end;
 
 function TToPas.TranslateSym(ASym: TSymbolC): boolean;
 begin
-  Result := Asym <> nil;
+  Result := (Asym <> nil)
+    and (ASym.DupeCount >= 0); // <> MaxDupe);
   if not Result then
     exit;
+//if ASym.DupeCount < 0 then Write('///'); //never reached!!!
   self.sym := ASym;
 //show origin
   if sym.loc.valid and (sym.loc.id <> inFile) then begin
@@ -1107,29 +1109,6 @@ begin
     exit;
   end;
 
-{$IFDEF old}
-//if got typesym, try use defined name
-  if i > 0 then begin //lookup complex type from typedef
-  //assume all typenames have been synthesized!
-    if fPtr then
-      Result := tsym.ptrname
-    else
-      Result := tsym.typename;
-    assert(Result <> '', 'no typename assigned?');
-    exit; //done
-  end;
-
-  //make sure that the type has been defined?
-  if Globals.getType(Result) = nil then begin
-  //is not a defined type
-  //todo: define in uParseC, when reference occurs!
-    beep; //debug, must have been defined!!!
-  //def in recursive invocation??? basetype? (only AFTER sym creation!)
-    sym := Globals.defType(unQuoteType(Result), def, id); //def=???
-  //all done?
-  end;
-{$ELSE}
-{$ENDIF}
 //default: tsym.name or what?
   Result := tsym.Ref(fPtr); //always quoted!?
   if not fQuoteCasts then
@@ -1157,22 +1136,7 @@ begin //expect quoted typename - unquote
   s := Unquoted(typeQuote); //ready for lookup by name
   tsym := Globals.getType(s); //either w/o quotes
   assert(tsym <> nil, 'type ref without type');
-{$IFDEF __typenames}
-//better use namesym and show its unique name?
-  if (tsym.typename <> '') then begin
-    //UniqueName(s)
-    Write(unQuoteType(tsym.typename));
-    exit;
-  end;
-//no typename, check name
-  i := Pos(':', s);
-  if i > 0 then begin
-    s[i] := '_';
-    tsym.typename := quoteType(s); //for later use
-  end;
-{$ELSE}
   s := tsym.typeName(False); //unquoted
-{$ENDIF}
   Write(s);
 end;
 
@@ -1550,7 +1514,8 @@ var
       //WriteFake
         WriteLn('P'+s + ' = ^' + s + ';' + ' //forward')
       else
-        WriteLn(tsym.ptrName(False) + ' = ^' + s + ';');
+        //WriteLn(tsym.ptrName(False) + ' = ^' + s + ';');
+        WriteLn(tsym.PtrSym.UniqueName + ' = ^' + s + ';');
     end; //else no (fake) ptr here!
   //show record or enum
     sym := tsym; //to be shown, possibly instead of name sym
@@ -1623,7 +1588,7 @@ begin //WriteTypeSym
     end;
     if typ <> nil then begin
     //unstructured
-      s := typ.typeName(False); //unquoted
+      s := typ.UniqueName;
       Write(s + ' = ');
       pc := ScanDef(typ.Def);
       WriteTypePc(inNone); //type def, ^t valid (never convert!)
@@ -1820,7 +1785,8 @@ var
     SetString(n, pd, pc - pd);  //assume delim is not the first char!
 
   //don't unify local names (for now)
-    Write(n + '_1');
+    //Write(n + '_1');
+    Write(n); //hope that there are no name clashes
   end;
 
   procedure WriteParamType;
@@ -1836,15 +1802,7 @@ var
     SetString(def, pc0, pc - pc0);
     sym := Globals.forceParamType(def);
     if sym <> nil then begin
-    {$IFDEF __typenames}
-      //todo: sym.UniqueName
-      if sym.typename <> '' then
-        Write(sym.typename(False)   always!
-      else
-        Write(sym.UniqueName);
-    {$ELSE}
       Write(sym.typename(False));
-    {$ENDIF}
     end else begin
       pc := pc0;
       WriteTypePc(inNone);

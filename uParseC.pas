@@ -1040,15 +1040,11 @@ var
       r.setNameSym;
     {$ENDIF}
       Result := nextToken <> opBeg;  //done?
-  {$IF __delayTags}
-    //nothing to create for untagged type
-  {$ELSE}
     end else if r.storage = KTypedef then begin
     //create public name??? - delay
       r.name := IntToStr(Globals.TypeCount); //# for tag
       r.nameID := 0;  //todo: substitute typename, if found
       r.loc := ScanSym.loc; //??? preceding key "struct"?
-  {$IFEND}
     end else //not a typedef --> type of var...
       r.name := '';
     r.makeTagRef(sue, r.name); //name like S:tag

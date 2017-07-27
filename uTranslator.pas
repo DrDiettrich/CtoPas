@@ -62,6 +62,7 @@ type
 
   TDupeList = class(TXStringList)
   public
+    KeyCnt, TypeCnt: integer; //imported, special handling
     constructor Create(const AName: string; AKey: integer = 0); override;
     function  AddKey(const s: string): integer;
       //define language keywords
@@ -102,40 +103,53 @@ end;
 function TDupeList.AddSym(sym: TSymbolC): integer;
 var
   s: string;
-  cnt:  byte;
+  cnt:  Shortint;
+  i0: integer;
   i: integer absolute Result;
+  tsym: TSymbolC; // TTypeDef;
 begin
   //sym.DupeCount := 0;
-  s := sym.UniqueName;  //possibly modified with Pascal type prefix...
+  s := sym.name; // sym.UniqueName;  //possibly modified with Pascal type prefix...
   cnt := 0;
-  i := -1;
-  while True do begin
-    i := FList.FindNext(s, i);
-    if i < 0 then
-      break; //no more occurences
-    if Items[i].FObject = sym then begin
+  Result := -1;
+  i := FList.FindNext(s, -1);
+  i0 := i; //first occurence
+  while i >= 0 do begin
     (* non-static symbols occur in multiple scopes,
       but must be added only once to the dupe list.
     *)
-      //Log('dupe: ' + s, lkTrace);
+    if Items[i].FObject = sym then
       exit; //is already stored
-    end;
     inc(cnt);
+    i := FList.FindNext(s, i);
   end;
   Result := self.FList.Push(s); //FList.Add(s, True); //always add
   Items[Result].FObject := sym;
+//todo: for now we only have keyCnt (not even exact)
+  if i0 < 0 then
+    cnt := 0 //not found, no dupe
+  else if i0 < KeyCnt then
+    //sym.DupeCount := cnt //dupe of Delphi key - always modify
+  //else if i0 < TypeCnt then //check Def's
+  else if sym.kind = stTypedef then begin
+  //hide duplicate declarations - shown as t.tsym.Uni !!!
+    TObject(tsym) := Items[i0].FObject;
+    if (TTypeDef(sym).TypeSym = tsym)
+    or ((tsym.kind = stTypeDef)
+    and (tsym.Def = sym.Def)) then
+      cnt := -1; //hide duplicate declaration
+  end;
   sym.DupeCount := cnt;
-//todo: store Delphi name in sym
 end;
 
 constructor TDupeList.Create;
 begin
   inherited;
 (* When the source language is case insensitive,
-  only one occurence of an name must be stored.
+  only one occurence of a name must be stored.
 
   Problem: how to handle clashes with predefined names of the *target* language?
-  Adding such an name would result in just finding this one...
+  Adding such a name would result in just finding this one...
   -> Entries must distinguish between source and target symbols!
 *)
   FList.fCaseInsensitive := not fCasedNames;  // True;
@@ -258,6 +272,7 @@ var
       LogBug('missing scope');  //further errors will occur!
       exit;
     end;
+    AllSyms.Capacity := AllSyms.Count + syms.Count;
     for i := 0 to syms.Count - 1 do begin
       sym := syms.getSym(i);
       AllSyms.AddSym(sym);
@@ -278,6 +293,7 @@ begin
         AllSyms.AddKey(s);
       end;
     end;
+    AllSyms.KeyCnt := AllSyms.Count;
   end;
   CloseFile(f);
 //load globals
