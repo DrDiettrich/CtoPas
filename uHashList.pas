@@ -88,6 +88,7 @@ type
     procedure Link(Index: integer; h: integer = -1);
 {$ENDIF}
   public  //API
+    JustFound: PHashItem;
     procedure Clear(newCapacity: integer);
     procedure Rebuild(newCapacity: integer);
     function  FindNext(const S: string; after: integer = -1): integer;
@@ -347,6 +348,7 @@ begin
     item.iNext := root.iFirst;
     root.iFirst := Result;
   end;
+  JustFound := item;
 end;
 
 (* Unlink - unlink item at Index
@@ -489,6 +491,10 @@ begin
     end;
     Result := p.iNext;
   end;
+  if Result >= 0 then
+    JustFound := p
+  else
+    JustFound := nil;
 end;
 
 procedure OHashList.Rebuild(newCapacity: integer);

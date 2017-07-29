@@ -129,6 +129,7 @@ var //configuratio
 const
   fQuoteCasts = True;
   __refToBase = False; //canonic!
+  __TypeList = True; //using definitions list?
 
 //name display requires various modes
 var //use enum?
@@ -222,10 +223,14 @@ type
   TScope = class;
 
   TSymbolC = class(TSymbol)
+  private
+    FDef: string;
+    //function GetTokens: TTokenArray;
   protected
     function  GetCaption: string; override;
     function  GetName: string; override;
       //questionable!
+    procedure SetDef(const Value: string); virtual;
   public
     kind: eSymType;
     DupeCount: Shortint; //signed  byte; //determined when added to dupe list
@@ -233,11 +238,11 @@ type
     ScopeNum:   byte;  //byte should be sufficient?
     storage: eStorageClass; //extern!?
     //name: string; //? for independence from owner list?
-    Def:  string; //name of type, name or "S:tag" (typedef: editable!)
     BaseType: TTypeDef; //
       //intended purpose: dummy typedefs for anonymous complex types.
   //values, depending on kind:
     StrVal: string; //format: Ansi?
+    property Def:  string read FDef write SetDef; //name of type, name or "S:tag" (typedef: editable!)
     destructor  Destroy; override;
     function  SetID(nameID: integer): integer;
     function  toString: string; override;  //full (meta) string
@@ -269,6 +274,7 @@ type
   TTypeDef = class(TSymbolC)
   protected
     function  GetCaption: string; override;
+    procedure SetDef(const Value: string); override;
   public
     constructor Create(const AName: string; AKey: integer = 0); override;
     //property  Ref: string read GetName; //quote???
@@ -576,6 +582,9 @@ implementation
 uses
   SysUtils,
   uDirectives,  //pragma handlers
+{$IF __TypeList}
+  uTypeList,
+{$IFEND}
   uParseC, StrUtils;
 
 var
@@ -746,6 +755,9 @@ I __inline
 (* InitAlias - init predefined types and keyword alias.
   Some compiler specific keywords and types deserve special handling.
   Here we define all these "__..." symbols.
+
+  Also define basic canonic C types
+  - except 'VOID', which must be #defined in Win headers!
 *)
 procedure InitAlias;
 begin
@@ -760,13 +772,18 @@ begin
   Symbols.addKey('inline', Kinline);
 //predefined types
   Globals.Clear;
-  Globals.defType('PVOID', '*v', 0); //void is not valid/special
+//todo: should use BaseTypeNames!
+  //Globals.defType('PVOID', '*v', 0); //void is not valid/special
   Globals.defType('char', 'c', 0); //todo: hide in output!
   Globals.defType('int', 'i', 0);
+{
   Globals.defType('float', 'f', 0);
   Globals.defType('double', 'd', 0);
+  Globals.defType('extended', 'D', 0);
+}
 //L becomes SInt8??? should be unsigned!!!
-  Globals.defType('ULargeInteger', 'L', 0); //?unsigned int64 (signed: TLargeInteger
+  Globals.defType('LargeInteger', 'L', 0); //?unsigned int64 (signed: TLargeInteger
+  Globals.defType('ULargeInteger', '+L', 0); //?unsigned int64 (signed: TLargeInteger
   Globals.defType('__int8',  '-1', 0);
   Globals.defType('__int16', '-2', 0);
   Globals.defType('__int32', '-4', 0);
@@ -879,8 +896,8 @@ begin
           Log('redef ' + AName, lkTodo);
           Log('as ' + ADef, lkTodo);
         end;
-      end;
-      Result.Def := ADef; //always redef
+      end else
+        Result.Def := ADef; //always redef?
     end;  //else must keep old def!
     if AVal <> NoVal then begin
       if (Result.StrVal <> NoVal) and (Result.StrVal <> AVal) then begin
@@ -944,17 +961,6 @@ end;
 
 function TTypeDefs.defType(const AName, ADef: string; id: integer): TTypeDef;
 begin
-  if (id = 0) then begin
-  //debug: ref to Symbols[]?
-  //intentional (created later?) or simply forgotten?
-    if (Pos(':', AName)>0) then begin
-      //become sym?
-    end else begin
-
-    end;
-  end else begin
-  //mark as typename?
-  end;
   TSymbolC(Result) := defSym(stTypedef, AName, ADef);
   Result.SetID(id);
 end;
@@ -1242,7 +1248,7 @@ var
   begin
     while ReadCVP do begin
       sym := Globals.defVar(n, t, v);
-      if typ <> nil then sym.BaseType := typ;
+      if typ <> nil then sym.BaseType  := typ;
     end;
   end;
 
@@ -1681,6 +1687,10 @@ var
   var
     i: integer;
   begin
+  {$IF __TypeList}
+    sym := Types.FindSym(ADef);
+    Result := sym <> nil;
+  {$ELSE}
     for i := 0 to Count - 1 do begin
       sym := self.getType(i);
       Result := (sym <> nil) and (sym.Def = ADef);
@@ -1688,6 +1698,7 @@ var
         exit;
     end;
     Result := False;
+  {$IFEND}
   end;
 
 begin //closestType - try find typename - synthesize if required?
@@ -1739,7 +1750,7 @@ begin //closestType - try find typename - synthesize if required?
       //create TypeSym, refer to closest TypeSym
         sym := getType(post);
         if sym = nil then begin
-          sym := defType(Result, ADef[1]+quoteType(post), Symbols.Add(Result));
+          sym := defType(Result, ADef[1]+quoteType(post), 0);  //, Symbols.Add(Result));
         end;
       end;
       exit;
@@ -1781,7 +1792,7 @@ var
       tname[i] := '_'; //pretty name!
     if Def = '' then
       Def := ADef;
-    symid := Symbols.Add(tname);
+    symid := Symbols.FindFirst[tname];
     sym := defType(tname, Def, symid);
   end;
 
@@ -1790,14 +1801,23 @@ var
   var
     i: integer;
   begin
-    for i := 0 to Count - 1 do begin
-      sym := self.getType(i);
-      Result := (sym <> nil) and (sym.Def = ADef);
-      if Result then
-        exit;
+  {$IF __TypeList}
+    sym := Types.FindSym(ADef);
+    Result := sym <> nil;
+  {$ELSE}
+  //debug
+    //if not Result then
+    begin
+      for i := 0 to Count - 1 do begin
+        sym := self.getType(i);
+        Result := (sym <> nil) and (sym.Def = ADef);
+        if Result then
+          exit;
+      end;
+      sym := nil; //clear effective Result
+      Result := False;
     end;
-    sym := nil; //clear effective Result
-    Result := False;
+  {$IFEND}
   end;
 
   procedure modType(prefix: char);
@@ -1919,8 +1939,8 @@ begin //forceType
   '~':  forceInc('~Array of Const');  //invalid in mixed language projects
 *)
   else  //break;  //unexpected char, ends current type
-    LogBug('unsupported type: ' + ADef);
-    lookup;
+    if not lookup then
+      LogBug('unsupported type: ' + ADef);
   end;
 end;
 
@@ -2671,6 +2691,21 @@ begin
     Result := Result + '_' + IntToStr(DupeCount);
 end;
 
+procedure TTypeDef.SetDef(const Value: string);
+begin
+//once assigned, the definition of a type cannot be changed
+  if FDef <> '' then begin
+    if FDef <> Value then
+      LogBug('no redef '+name);
+    exit;
+  end;
+  FDef := Value;
+{$IF __TypeList}
+  //self.TypeIdx :=
+    Types.AddDef(self);
+{$IFEND}
+end;
+
 { TSymbolC }
 
 destructor TSymbolC.Destroy;
@@ -2796,6 +2831,11 @@ begin
     //which parent table???
   if self.ScopeNum > 0 then
     Result := Result + '$' + IntToStr(ScopeNum);
+end;
+
+procedure TSymbolC.SetDef(const Value: string);
+begin
+  FDef := Value;
 end;
 
 { TSymVar }
