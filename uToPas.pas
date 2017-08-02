@@ -509,9 +509,12 @@ end;
 function TToPas.TranslateSym(ASym: TSymbolC): boolean;
 begin
   Result := (Asym <> nil)
+    and not ASym.fShown
     and (ASym.DupeCount >= 0); // <> MaxDupe);
   if not Result then
     exit;
+  ASym.fShown := True;
+
 //if ASym.DupeCount < 0 then Write('///'); //never reached!!!
   self.sym := ASym;
 //show origin
@@ -527,7 +530,7 @@ begin
   stProc:       WriteProcSym;
   stTypedef:    WriteTypeSym;
   else  //todo
-    beep;
+    LogBug('unhandled type to show: '+ symKinds[sym.kind]);
   end;
 end;
 
@@ -1143,8 +1146,18 @@ end;
 procedure TToPas.WriteSized(fSigned: boolean; len: char);
 const
   aSigned: array[boolean] of string = ('UInt', 'SInt');
+var
+  i: integer;
+  t: eToken;
 begin
+{$IFDEF old}
   Write(aSigned[fSigned] + len);
+{$ELSE}
+  i := Pos(len, szChars);
+  if i > 0 then
+    tname := szNames[i]
+  ...
+{$ENDIF}
 end;
 
 (* Show basic type
@@ -1187,9 +1200,11 @@ begin
     begin //single level search, for now
       s := Unquoted(typeQuote);
       typ := Globals.getType(s);
-      if (typ <> nil) and (Length(typ.def) = 2) and (typ.Def[2] in digits) then
+      if (typ <> nil) and (Length(typ.def) = 2) and (typ.Def[2] in digits) then begin
+      //never reached!?
+        s := typ.typeName(false);
         WriteSized(fSigned, typ.Def[2])
-      else begin
+      end else begin
         Write(asSigned[fSigned] + s);
       end;
       dec(pc);  //inc after switch
@@ -1406,6 +1421,7 @@ begin
     'i':  WriteUnSigned(True);  //WriteInc('Integer');
     'l':  WriteUnSigned(True);  //WriteInc('LongInt');
     's':  WriteUnSigned(True);  //WriteInc('SmallInt'); //assume "short" is 16 bit
+    'w':  WriteInc('WideChar');
     '~':  WriteInc('~Array of Const');  //invalid in mixed language projects
     else  break;  //unexpected char, ends current type
     end;
@@ -1427,6 +1443,7 @@ begin
     Outdent('type');
     curkind := stTypeDef;
   end;
+{$IFDEF old}
 //todo: make and use this as unit
   if not typeswritten then begin
     CreateComplexTypeNames;
@@ -1457,6 +1474,8 @@ begin
     //dec(indent);
     WriteLn(' ');
   end;
+{$ELSE}
+{$ENDIF}
 end;
 
 procedure TToPas.CreateComplexTypeNames;
@@ -2549,7 +2568,6 @@ end;
 procedure TToPas.WriteIntf;
 var
   i: integer;
-  c: eKnownLibs;
 begin
 //"interface" already shown.
 //"uses"???
@@ -2563,24 +2581,6 @@ begin
     fLibName := True; //use libref
   end;
 {$ELSE}
-(* Symbols are predefined macros, are listed anyhow
-  Create constants in TMacroLibs!
-  But a list would be nice, like in Windows.pas:
-const
-  advapi32  = 'advapi32.dll';
-  kernel32  = 'kernel32.dll';
-  ...
-*)
-  if UnitType = utImport then begin
-    ConstSection;
-  //add dummy/default library
-    WriteLn(UnknownLib + ' = ''unknown.dll'';');
-    WriteLn(LibRef + ' = ''' + LibName + ''';');
-    for c := low(c) to high(c) do begin
-      //only if macro used?
-      WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
-    end;
-  end;
 {$ENDIF}
 
   for i := 0 to Scope.Count - 1 do begin
@@ -2628,11 +2628,12 @@ end;
 procedure TToPas.WriteImpl;
 var
   fin: TextFile;
-  s, c: string;
+  s: string;
   i: integer;
 //new format
   ln: string;
   symc: char;
+  c: eKnownLibs;
 
   //procedure ReadLine;
   function  ReadLine: boolean;
@@ -2671,6 +2672,8 @@ var
   end;
 
   procedure ReadCont;
+  var
+    c: string;
   begin
     while s[Length(s)] = ListTerm do begin
     //append wrapped lines
@@ -2729,6 +2732,18 @@ begin //WriteImpl
   Outdent('implementation');
   //WriteLn(' ');
   self.curkind := stUnknown;  //-> empty line before next clause
+
+//import libs?
+  if UnitType = utImport then begin
+    ConstSection;
+  //add dummy/default library
+    WriteLn(UnknownLib + ' = ''unknown.dll'';');
+    WriteLn(LibRef + ' = ''' + LibName + ''';');
+    for c := low(c) to high(c) do begin
+      //only if macro used?
+      WriteLn(KnownLibs[c].sym  + ' = ''' + KnownLibs[c].lib + ''';');
+    end;
+  end;
 
 (* ALL symbols created in Statics, except types and extern procs.
 *)

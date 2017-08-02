@@ -233,6 +233,7 @@ type
     procedure SetDef(const Value: string); virtual;
   public
     kind: eSymType;
+    fShown: boolean; //shown in output?
     DupeCount: Shortint; //signed  byte; //determined when added to dupe list
       //intended purpose: substitution of conflicting names
     ScopeNum:   byte;  //byte should be sufficient?
@@ -433,14 +434,42 @@ other - local
     procedure Save;
   end;
 
-// --- a helper object, used while parsing declarations ---
-
+type //modifiers, default base type = int
   eSized = (szNone, szShort, szLong, szLongLong);
+const
+  SizedInt: array[eSized] of char = 'islL';
 
+const //at end of Definition
+  BaseTypeChars = 'vcwsilLfdD';  //-+"';
+//these names are applicable (only) in modified types (PINT...).
+  BaseTypeNames: array[1..10] of string = (
+    'VOID', 'CHAR', 'WCHAR',
+    'SHORT', 'INT', 'LONG', 'LONGLONG',
+    'FLOAT', 'DOUBLE', 'EXTENDED'
+  );
+const //digits after +/- and canonic names for modified types
+  szChars = '1248';
+  szNames: array[1..4] of string = (
+    'CHAR', 'SHORT', 'LONG', 'LONGLONG'
+  );
+  aSized: array[eSizedTypes] of string = (
+    '-1', '-2', '-4', '-8',
+    '+1', '+2', '+4', '+8'
+  );
+  CSized: array[eSizedTypes] of string = (
+    '__int8', '__int16', '__int32', '__int64',
+    '__uint8', '__uint16', '__uint32', '__uint64'
+  );
+  DSized: array[eSizedTypes] of string = (
+    'ShortInt', 'SmallInt', 'LongInt', 'Int64',
+    'Byte', 'Word', 'LongWord', 'ULargeInteger'
+  );
+
+type
   TDeclAttrs = set of Kconst..Kvolatile;
   //eCallConv = Kcdecl..Kstdcall;
 
-//unused!
+{//unused!
   TPublic = (
     pubAuto,  //typically global symbol
     //pubGlobal,
@@ -449,6 +478,9 @@ other - local
     pubParam,   //as parameter -> in??? (explicit scope!?)
     pubLocal    //as local variable -> explicit scope
   );
+}
+
+// --- a helper object, used while parsing declarations ---
 
 (* Manage type declarations, as strings.
 *)
@@ -567,15 +599,6 @@ const
     ExpTermT = t_empty;
     ExpSep = ',';
   {$ENDIF}
-
-const
-  BaseTypeChars = 'vcwsilLfdD';  //-+"';
-//these names are applicable (only) in modified types (PINT...).
-  BaseTypeNames: array[1..10] of string = (
-    'VOID', 'CHAR', 'WCHAR',
-    'SHORT', 'INT', 'LONG', 'LONGLONG',
-    'FLOAT', 'DOUBLE', 'EXTENDED'
-  );
 
 implementation
 
@@ -760,6 +783,25 @@ I __inline
   - except 'VOID', which must be #defined in Win headers!
 *)
 procedure InitAlias;
+
+  procedure DelphiType(const AName, ADef: string);
+  var
+    tsym: TTypeDef;
+  begin
+    tsym := Globals.defType(AName, ADef, 0);
+    tsym.fShown := true; //imported from System
+  end;
+
+  procedure DSizedTypes;
+  var
+    i: eSizedTypes;
+  begin
+    for i := low(i) to high(i) do begin
+      DelphiType(DSized[i], aSized[i]); //hidden
+      Globals.defType(CSized[i], aSized[i], 0);
+    end;
+  end;
+
 begin
 {$IF __PreInclude}
 //include handler
@@ -772,26 +814,24 @@ begin
   Symbols.addKey('inline', Kinline);
 //predefined types
   Globals.Clear;
-//todo: should use BaseTypeNames!
   //Globals.defType('PVOID', '*v', 0); //void is not valid/special
-  Globals.defType('char', 'c', 0); //todo: hide in output!
+  DelphiType('pointer', '*v');
+  DelphiType('Char', 'c');
+  DelphiType('WideChar', 'w');
+  DelphiType('Integer', 'i');
+  DelphiType('Cardinal', '+i');
+  DelphiType('LargeInteger', 'L');
+  DelphiType('ULargeInteger', '+L');
+
+  Globals.defType('char', 'c', 0);
+  Globals.defType('wchar_t', 'w', 0);
   Globals.defType('int', 'i', 0);
 {
   Globals.defType('float', 'f', 0);
   Globals.defType('double', 'd', 0);
   Globals.defType('extended', 'D', 0);
 }
-//L becomes SInt8??? should be unsigned!!!
-  Globals.defType('LargeInteger', 'L', 0); //?unsigned int64 (signed: TLargeInteger
-  Globals.defType('ULargeInteger', '+L', 0); //?unsigned int64 (signed: TLargeInteger
-  Globals.defType('__int8',  '-1', 0);
-  Globals.defType('__int16', '-2', 0);
-  Globals.defType('__int32', '-4', 0);
-  Globals.defType('__int64', '-8', 0);
-  Globals.defType('__uint8',  '+1', 0);
-  Globals.defType('__uint16', '+2', 0);
-  Globals.defType('__uint32', '+4', 0);
-  Globals.defType('__uint64', '+8', 0); //=ULargeInteger
+  DSizedTypes;
 end;
 
 { TScope }
@@ -890,12 +930,16 @@ begin
     end;
     if ADef <> '' then begin
       if (Result.Def <> '') and (Result.Def <> ADef) then begin
+      {$IFDEF old}
       //filter old style procedure redefinitions - detect how?
         if Pos('()', Result.Def) <= 0 then begin
         //if Result.Def <> '()i' then begin
           Log('redef ' + AName, lkTodo);
           Log('as ' + ADef, lkTodo);
         end;
+      {$ELSE}
+        //no msg, nothing changed
+      {$ENDIF}
       end else
         Result.Def := ADef; //always redef?
     end;  //else must keep old def!
@@ -1861,11 +1905,6 @@ var
   procedure forceUnSigned(fUnsigned: boolean);
   var
     i: integer;
-  const
-    szChars = '1248';
-    szNames: array[1..4] of string = (
-      'CHAR', 'SHORT', 'LONG', 'LONGLONG'
-    );
   begin
   (* expect digit or basic (int/char) type
   *)
@@ -2026,12 +2065,6 @@ end;
 procedure RType.type_specifier(i_ttyp: eToken; fDefault: boolean);
 var
   s_typ0: string;
-const
-  SizedInt: array[eSized] of char = 'islL';
-  aSized: array[Kint8_t..Kuint64_t] of string = (
-    '-1', '-2', '-4', '-8',
-    '+1', '+2', '+4', '+8'
-  );
 begin
 //check spec already finished?
 {$IFDEF new}
@@ -2044,8 +2077,7 @@ begin
     //assert(specToken = i_ttyp, 'redef base type');
     if specToken = i_ttyp then
       exit;
-    Log('redef base type', lkTodo);
-    //continue to debug
+    LogBug('redef base type'); //continue to debug
   end;
 //make base type
   case i_ttyp of

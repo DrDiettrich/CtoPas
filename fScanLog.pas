@@ -194,8 +194,7 @@ begin
   case kind of
   lkProgress:
     if fLogProgress then begin
-      if lbMsg.Items.Count > 100 then
-        lbMsg.Clear;  //destroy objects?
+      //if lbMsg.Items.Count > 100 then lbMsg.Clear;  //destroy objects?
       self.lbMsg.Items.Add(msg);  //no objects?
     end;
   else  //log message, remember and show position
@@ -756,12 +755,14 @@ begin
   dt := now-t0; //timediff in days
   dt := dt * 24 * 60 * 60; //in seconds
   str(dt:2:3, s);
-  self.LogMsg('in '+s, lkProgress);
+  self.LogMsg('in '+s, lkTrace); //lkProgress clears the display!
 
+{//clears the display???
   //scroll into view
   i := lbMsg.Items.Count - 5;
   if i > 0 then
     lbMsg.TopIndex := i;
+}
 end;
 
 procedure TScanLog.StartTime;

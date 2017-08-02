@@ -118,8 +118,19 @@ begin
     (* non-static symbols occur in multiple scopes,
       but must be added only once to the dupe list.
     *)
-    if Items[i].FObject = sym then
+    TObject(tsym) := Items[i].FObject;
+    if tsym = sym then
       exit; //is already stored
+    if (tsym <> nil)
+    and (sym.kind = stTypedef)
+    and (tsym.kind = stTypeDef) then begin
+    //check for equal Def
+      if tsym.Def = sym.Def then begin
+        sym.DupeCount := tsym.DupeCount;
+        sym.fShown := True; //assume tsym shown before
+        exit;
+      end;
+    end;
     inc(cnt);
     i := FList.FindNext(s, i);
   end;

@@ -161,6 +161,7 @@ type
   eStorageClass = Kauto..Ktypedef;
 {$IFEND}
   eSimpleTypes = Kvoid..Kuint64_t;
+  eSizedTypes = Kint8_t..Kuint64_t;
 
 const //for the parser!
   storage_class_specifierS = [Kauto..Ktypedef];
