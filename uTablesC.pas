@@ -815,10 +815,23 @@ procedure InitAlias;
   procedure DSizedTypes;
   var
     i: eSizedTypes;
+    df, nm: string;
+  const
+    sn: array[boolean] of string = ('UInt', 'SInt');
   begin
     for i := low(i) to high(i) do begin
-      DelphiType(DSized[i], aSized[i]); //hidden
+    {$IFnDEF old}
+    //make -1 show as SmallInt
+      //DelphiType(DSized[i], aSized[i]); //hidden
       Globals.defType(CSized[i], aSized[i], 0);
+    {$ELSE}
+      df := aSized[i];
+      nm := sn[df[1]='-'] + df[2];
+      DelphiType(DSized[i], df); //hidden
+      Globals.defType(nm, df, 0); //-1 --> SInt8
+      //Globals.defType(DSized[i], df, 0);
+      Globals.defType(CSized[i], df, 0);
+    {$ENDIF}
     end;
   end;
 

@@ -1449,7 +1449,7 @@ begin
     Outdent('type');
     curkind := stTypeDef;
   end;
-{$IFDEF old}
+{$IFnDEF old}
 //todo: make and use this as unit
   if not typeswritten then begin
     CreateComplexTypeNames;
@@ -1465,7 +1465,9 @@ begin
       WriteLn('UInt1 = Byte;');
       WriteLn('UInt2 = Word;');
       WriteLn('UInt4 = LongWord;');
-      WriteLn('//UInt8 = {unsigned}Int64; //no equivalent');
+      //WriteLn('//UInt8 = {unsigned}Int64; //no equivalent');
+      WriteLn('UInt8 = ULargeInteger;');
+(*
     Outdent('//"S"igned and "U"nsigned types of unspecific size');
     //C char is compatible with "int", not so in Pascal
       WriteLn('UChar = Char;');
@@ -1476,6 +1478,7 @@ begin
       WriteLn('SShort = SInt2;');
       WriteLn('SInt = Integer;');
       WriteLn('SLong = Integer;');
+*)
   //more?
     //dec(indent);
     WriteLn(' ');
