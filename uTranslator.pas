@@ -143,12 +143,15 @@ begin
     //sym.DupeCount := cnt //dupe of Delphi key - always modify
   //else if i0 < TypeCnt then //check Def's
   else if sym.kind = stTypedef then begin
+  {$IF __TypeSyms}
   //hide duplicate declarations - shown as t.tsym.Uni !!!
     TObject(tsym) := Items[i0].FObject;
     if (TTypeDef(sym).TypeSym = tsym)
     or ((tsym.kind = stTypeDef)
     and (tsym.Def = sym.Def)) then
       cnt := -1; //hide duplicate declaration
+  {$ELSE}
+  {$IFEND}
   end;
   sym.DupeCount := cnt;
 end;

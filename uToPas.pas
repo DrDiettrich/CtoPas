@@ -974,11 +974,16 @@ end;
 {$ELSE}
 {$ENDIF}
 
+(* new: also handle *( ptr case
+*)
 procedure TToPas.WriteProcType;
 var
   i: integer;
   pe: PChar;
 begin
+  if pc^ = '*' then
+    inc(pc);
+  assert(pc^ = '(', 'expected proc type');
   inc(pc);  //skip "("
 //distinguish proc from func
 //here we *must* search for the end of the parameter list - more may follow!
@@ -1150,7 +1155,8 @@ var
   i: integer;
   t: eToken;
 begin
-{$IFDEF old}
+//todo: standard names???
+{$IFnDEF old}
   Write(aSigned[fSigned] + len);
 {$ELSE}
   i := Pos(len, szChars);
@@ -1529,12 +1535,16 @@ var
     //if esu in ['S', 'U'] then begin
     if showFwdPtr then begin
     //always show ptr
+    {$IF __TypeSyms}
       if tsym.PtrSym = nil then
       //WriteFake
         WriteLn('P'+s + ' = ^' + s + ';' + ' //forward')
       else
         //WriteLn(tsym.ptrName(False) + ' = ^' + s + ';');
         WriteLn(tsym.PtrSym.UniqueName + ' = ^' + s + ';');
+    {$ELSE}
+        WriteLn('P'+s + ' = ^' + s + ';' + ' //forward')
+    {$IFEND}
     end; //else no (fake) ptr here!
   //show record or enum
     sym := tsym; //to be shown, possibly instead of name sym
@@ -1544,6 +1554,7 @@ var
     'E':  WriteEnum;
     'S':  WriteStruct(inNone);
     'U':  WriteUnion(inNone);
+    'P':  WriteProcType();
     else  assert(False, 'expected S/U/E');
     end;
   end;
@@ -1590,6 +1601,7 @@ begin //WriteTypeSym
     //if hideSym(typ) then exit; //named struct or defined ptr to struct
     TypeSection; //delay until symbol shown?
     if isStructured(typ) then begin
+  {$IF __TypeSyms}
       if typ.TypeSym <> nil then
         exit; //show with TypeSym
       ShowRec(typ);
@@ -1604,6 +1616,10 @@ begin //WriteTypeSym
         exit //ptr already shown
       else
         typ := TTypeDef(sym); //revert to current sym
+  {$ELSE}
+      ShowRec(typ);
+      typ := nil; //flag shown
+  {$IFEND}
     end;
     if typ <> nil then begin
     //unstructured

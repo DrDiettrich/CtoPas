@@ -45,48 +45,56 @@ Value = (name | num";" | ["L"]("string"|'char')";"). /* also expression? */
 *)
 (* Problems:
   Distinguish proc/func? -> first args optional: this, result
-  Distinguish Struct/Union/Enum from other types?
+  Distinguish Struct/Union/Enum from other types? ":"
   Char types?
   Modifiers? (scope, callconv, param, bitfields, strings)
-a   sym:argument
-b
-C class, pmod:cdecl
++ unsigned
+- signed
+# const
+! static
+<...> bitfield
+[] array
+(mbr) procedure
+{mbr} structured type
+ a   sym:argument
+ b
 c char, pmod:constructor, sym:const
+C pmod:cdecl
+d double
 D long double (extended)
-d double, pmod:destructor
-E enum
 e   sym:enum-member
-F pmod:fastcall
+E: enum
 f float, sym:field
-g
-h
-I interface [amod:const/in, pmod:inline]
+F pmod:fastcall
+ g
+ h
 i int
-j
-k
-L int64, [#mod:Unicode]
+I pmod:inline
+ j
+ k
 l long
+L long long (int64)
+ m
 M   sym:macro
-m   sym:method
-n
-o amod:out, pmod:operator
-P   sym:proc
-p pmod:procedure
+ n
+ o amod:out, pmod:operator
+p   sym:proc
+P: proc type
 q
-R amod:Result
-r amod:ref
-S struct
+ r amod:ref
+R restricted
 s short
-T amod:this,  sym: template
+S: struct
 t   sym: type
-U union
-u unsigned (int) = cardinal
-V amod:value, vmod:volatile
+ T amod:this,  sym: template
+ u "+" unsigned (int) = cardinal
+U: union
 v void, sym:var
-w
-x
-y
-z
+V vmod:volatile
+w WideChar
+ x
+ y
+ z
 --------
 set?
 string?
@@ -130,6 +138,7 @@ const
   fQuoteCasts = True;
   __refToBase = False; //canonic!
   __TypeList = True; //using definitions list?
+  __TypeSyms = False;
 
 //name display requires various modes
 var //use enum?
@@ -277,6 +286,10 @@ type
     function  GetCaption: string; override;
     procedure SetDef(const Value: string); override;
   public
+  {$IF __TypeSyms}
+    NameSym, PtrSym: TTypeDef;
+  {$ELSE}
+  {$IFEND}
     constructor Create(const AName: string; AKey: integer = 0); override;
     //property  Ref: string read GetName; //quote???
     function  Ref(fPtr: boolean): string;
@@ -284,12 +297,19 @@ type
     //property  toString: string read GetCaption;
     function  BodyString: string; override;
     function  UniqueName: string; override;
-  public
-    TypeSym, PtrSym: TTypeDef;
-    function ptrName(fQuoted: boolean=true): string;
-    function typeName(fQuoted: boolean=true): string;
+    function ptrName(fQuoted: boolean=true): string; virtual;
+    function typeName(fQuoted: boolean=true): string; virtual;
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
+
+  TStructType = class(TTypeDef)
+  public
+    NameSym, PtrSym: TTypeDef;
+  {
+    function ptrName(fQuoted: boolean=true): string; override;
+    function typeName(fQuoted: boolean=true): string; override;
+  }
+  end;
 
 //These scopes are based on definition strings.
 //new symbols: force local, or find in parent scopes???
@@ -1897,9 +1917,13 @@ var
       modType('P'); //debug
         exit; //what?
     end;
+  {$IF __TypeSyms}
   //can always override ptrsym? (last assign from typedef wins)
     if (basetype <> nil) and (basetype.PtrSym = nil) then
       basetype.PtrSym := sym;
+  {$ELSE}
+    //todo: handle ptr sym?
+  {$IFEND}
   end;
 
   procedure forceUnSigned(fUnsigned: boolean);
@@ -2328,6 +2352,7 @@ begin
     (* propagate defined names into basetype, as typeref (quoted)
       for use in "struct tag" and "struct tag *" references
     *)
+    {$IF __TypeSyms}
       if basetype <> nil then begin
       //direct or ptr name?
         typ := declSym as TTypeDef;
@@ -2345,6 +2370,8 @@ begin
         end else //assume all other types are used by direct ref to typename!?
           LogBug('unhandled typedef prefix ' + pre);
       end;
+    {$ELSE}
+    {$IFEND}
     end;
   end;  //case storage
   if (scope = nil) or (declSym <> nil) then
@@ -2367,7 +2394,7 @@ begin
         exit; //dupe proc?
         //or create proc-template here?
       end;
-    (* create as T:# or T_#?
+    (* create as P:# or P_#?
       getDef:=post+pre+spec
         if post is *(...), replace spec by the created type, retain * ?
         pre empty or * (*v!)
@@ -2376,14 +2403,17 @@ begin
       //declSym := Globals.defType('T_' + IntToStr(Globals.TypeCount), getDef, 0);
       spec := post+pre+spec; //retain * in front? or move into pre?
     //perfect for translator
-      typ := Globals.defType('T_' + IntToStr(Globals.TypeCount), spec, 0);
+      typ := Globals.defType('P:' + IntToStr(Globals.TypeCount), spec, 0);
       basetype := typ; //okay, force propagate into param sym!?
       spec := quoteType(basetype.name); //indicate non-basic typeref?
       post := ''; // '*'; //usage: *proc, but creates extra pointer type
       pre := '';
       declSym := typ; //prevent duplicate creation
     //this fixes proc ptr display
+    {$IF __TypeSyms}
       typ.PtrSym := typ; //both symbols to same proc type - we are basetype!
+    {$ELSE}
+    {$IFEND}
     {struct pattern:
       typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
       typ.loc := self.loc;
@@ -2698,19 +2728,29 @@ end;
 *)
 function TTypeDef.typeName(fQuoted: boolean=true): string;
 begin
+{$IF __TypeSyms}
   if TypeSym <> nil then
     result := TypeSym.name
   else
-    Result := name;
+  Result := name;
+{$ELSE}
+  Result := name;
+  if (Length(Result) > 2)
+  and (Result[2] = ':') then
+    Result[2] := '_';
+{$IFEND}
   if fQuoted then
     Result := quoteType(Result); //param?
 end;
 
 function TTypeDef.ptrName(fQuoted: boolean): string;
 begin
+{$IF __TypeSyms }
   if PtrSym <> nil then
     Result := PtrSym.name
   else
+{$ELSE}
+{$IFEND}
     Result := 'P' + typeName(False); //really synthetic ptr name?
   if fQuoted then
     Result := quoteType(Result); //param?
