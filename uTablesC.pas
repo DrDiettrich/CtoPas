@@ -282,6 +282,11 @@ type
 {$IFEND}
 
   TTypeDef = class(TSymbolC)
+  private
+    procedure SetStructName(const Value: TTypeDef);
+    procedure SetStructPtr(const Value: TTypeDef);
+    function GetStructName: TTypeDef;
+    function GetStructPtr: TTypeDef;
   protected
     function  GetCaption: string; override;
     procedure SetDef(const Value: string); override;
@@ -297,8 +302,14 @@ type
     //property  toString: string read GetCaption;
     function  BodyString: string; override;
     function  UniqueName: string; override;
-    function ptrName(fQuoted: boolean=true): string; virtual;
-    function typeName(fQuoted: boolean=true): string; virtual;
+    function ptrName(fQuoted: boolean=true): string; //virtual;
+    function typeName(fQuoted: boolean=true): string; //virtual;
+  {$IF __TypeSyms}
+  {$ELSE}
+    function isStruct: boolean;
+    property StructName: TTypeDef read GetStructName write SetStructName;
+    property StructPtr: TTypeDef read GetStructPtr write SetStructPtr;
+  {$IFEND}
   end;
   TSymType = TTypeDef;  //alias for use in parsetrees
 
@@ -815,23 +826,11 @@ procedure InitAlias;
   procedure DSizedTypes;
   var
     i: eSizedTypes;
-    df, nm: string;
-  const
-    sn: array[boolean] of string = ('UInt', 'SInt');
   begin
     for i := low(i) to high(i) do begin
-    {$IFnDEF old}
     //make -1 show as SmallInt
       //DelphiType(DSized[i], aSized[i]); //hidden
       Globals.defType(CSized[i], aSized[i], 0);
-    {$ELSE}
-      df := aSized[i];
-      nm := sn[df[1]='-'] + df[2];
-      DelphiType(DSized[i], df); //hidden
-      Globals.defType(nm, df, 0); //-1 --> SInt8
-      //Globals.defType(DSized[i], df, 0);
-      Globals.defType(CSized[i], df, 0);
-    {$ENDIF}
     end;
   end;
 
@@ -2426,6 +2425,8 @@ begin
     {$IF __TypeSyms}
       typ.PtrSym := typ; //both symbols to same proc type - we are basetype!
     {$ELSE}
+      //idx Types.Add('*'+typ.typeName(True));
+      Types.AddAlias(typ, '*'+spec);
     {$IFEND}
     {struct pattern:
       typ := Globals.defType(spec[1] + ':' + name, Copy(spec, 2, Length(spec)), 0);
@@ -2740,14 +2741,20 @@ end;
 (* names from type syms
 *)
 function TTypeDef.typeName(fQuoted: boolean=true): string;
+var
+  tsym: TTypeDef;
 begin
 {$IF __TypeSyms}
   if TypeSym <> nil then
     result := TypeSym.name
   else
-  Result := name;
+    Result := name;
 {$ELSE}
-  Result := name;
+  tsym := StructName;
+  if tsym <> nil then
+    Result := tsym.name
+  else
+    Result := name;
   if (Length(Result) > 2)
   and (Result[2] = ':') then
     Result[2] := '_';
@@ -2757,12 +2764,18 @@ begin
 end;
 
 function TTypeDef.ptrName(fQuoted: boolean): string;
+var
+  tsym: TTypeDef;
 begin
 {$IF __TypeSyms }
   if PtrSym <> nil then
     Result := PtrSym.name
   else
 {$ELSE}
+  tsym := StructPtr;
+  if tsym <> nil then
+    Result := tsym.name
+  else
 {$IFEND}
     Result := 'P' + typeName(False); //really synthetic ptr name?
   if fQuoted then
@@ -2789,6 +2802,59 @@ begin
   //self.TypeIdx :=
     Types.AddDef(self);
 {$IFEND}
+end;
+
+function TTypeDef.isStruct: boolean;
+begin
+{$IFDEF old}
+  Result := (length(name) > 2)
+    and (name[2] = ':');
+{$ELSE}
+  Result := (length(def) > 1)
+    and (def[1] in ['{','(']);
+{$ENDIF}
+end;
+
+procedure TTypeDef.SetStructName(const Value: TTypeDef);
+begin
+  assert(isStruct, 'invalid call');
+  if StructName <> nil then
+    exit; //no redef
+{$IF __TypeSyms}
+  self.NameSym := Value;
+{$ELSE}
+//set Types["S:tag"]=value
+  //should have been set in name definition
+{$IFEND}
+end;
+
+procedure TTypeDef.SetStructPtr(const Value: TTypeDef);
+begin
+  assert(isStruct, 'invalid call');
+  if StructPtr <> nil then
+    exit; //no redef
+{$IF __TypeSyms}
+  PtrSym := Value;
+{$ELSE}
+//set Types[*"S:tag"]=value
+  //should have been set in ptr definition
+{$IFEND}
+end;
+
+function TTypeDef.GetStructName: TTypeDef;
+begin
+  if isStruct then
+    Result := Types.FindSym(quoteType(name))
+  else
+    Result := nil;
+end;
+
+function TTypeDef.GetStructPtr: TTypeDef;
+begin
+  if isStruct then
+    Result := Types.FindSym('*'+quoteType(name))
+  else
+    Result := nil;
 end;
 
 { TSymbolC }

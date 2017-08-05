@@ -980,9 +980,11 @@ procedure TToPas.WriteProcType;
 var
   i: integer;
   pe: PChar;
+  psym: TTypeDef;
+  pn, ppn: string;
 begin
   if pc^ = '*' then
-    inc(pc);
+    inc(pc); //special handling required?
   assert(pc^ = '(', 'expected proc type');
   inc(pc);  //skip "("
 //distinguish proc from func
@@ -1531,10 +1533,17 @@ var
 
 //show pointer and record definition
   procedure ShowRec(tsym: TTypeDef);
+  var
+    nsym, psym: TTypeDef;
   begin
+    nsym := tsym.StructName;
+    psym := tsym.StructPtr;
     s := tsym.typeName(False);
+    WriteLn('//show '+tsym.name + ' ' + s + ' ' + tsym.ptrName(False));
+  (* included!
     if (Length(s) > 2) and (s[2] = ':') then
       s[2] := '_';
+  *)
     //if esu in ['S', 'U'] then begin
     if showFwdPtr then begin
     //always show ptr
@@ -1546,7 +1555,11 @@ var
         //WriteLn(tsym.ptrName(False) + ' = ^' + s + ';');
         WriteLn(tsym.PtrSym.UniqueName + ' = ^' + s + ';');
     {$ELSE}
-        WriteLn('P'+s + ' = ^' + s + ';' + ' //forward')
+      if psym <> nil then
+        TranslateSym(psym)
+      else
+        //WriteLn('P'+s + ' = ^' + s + ';' + ' //forward');
+        WriteLn(tsym.ptrName(false) + ' = ^' + s + ';' + ' //forward');
     {$IFEND}
     end; //else no (fake) ptr here!
   //show record or enum
@@ -1560,6 +1573,8 @@ var
     'P':  WriteProcType();
     else  assert(False, 'expected S/U/E');
     end;
+    if nsym <> nil then
+      nsym.fShown := True; //as struct name
   end;
 
   function isStructured(tsym: TTypeDef): boolean;
@@ -1567,7 +1582,7 @@ var
     Result := False;
     if tsym = nil then
       exit; //not a sym
-    s := tsym.name;
+    s := tsym.name; //original, not assigned!
     Result := (Length(s) > 2) and (s[2] = ':');
     if not Result then
       exit;
@@ -1604,6 +1619,9 @@ begin //WriteTypeSym
     //if hideSym(typ) then exit; //named struct or defined ptr to struct
     TypeSection; //delay until symbol shown?
     if isStructured(typ) then begin
+    (* Mix: first sym is S:tag, show as ptr
+      second sym is *S:tag, show as {...}
+    *)
   {$IF __TypeSyms}
       if typ.TypeSym <> nil then
         exit; //show with TypeSym

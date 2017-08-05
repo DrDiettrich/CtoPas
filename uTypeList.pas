@@ -65,6 +65,7 @@ type
       //language types, reject multiple names for same def? (no lookup by name)
   {$ELSE}
   {$ENDIF}
+    function  AddAlias(ASym: TTypeDef; ADef: string): integer;
     function  AddRef(Adef: string): integer;
       //Before symbol creation: add first usage only, create dummy type, return what?
     function  AddDef(sym: TTypeDef): integer;
@@ -123,6 +124,17 @@ begin
     JustFound.typename := AName;
 {$ELSE}
 {$IFEND}
+end;
+
+function TTypeList.AddAlias(ASym: TTypeDef; ADef: string): integer;
+begin
+  Result := Find(ADef);
+  if Result < 0 then
+    Result := AddObjectName(ADef, ASym, ASym.name)
+  else if JustFound.r.FObject = nil then
+    JustFound.r.FObject := ASym
+  else
+    LogBug('redef alias');
 end;
 
 (* Find and set JustFound
@@ -194,6 +206,7 @@ begin
     begin
     //strip parameter names?
       Result := AddObjectName(sym.Def, sym, sym.name);
+      AddObjectName('*' + sym.Def, sym, sym.name); //same for pointer
       //if todo then
         exit; //for now
     end;
