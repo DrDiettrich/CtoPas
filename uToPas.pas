@@ -1011,6 +1011,25 @@ begin
 {$ELSE}
   WriteParams;
 {$ENDIF}
+  if typ <> sym then
+    exit; //not typedef shown
+  if not typ.isStruct then
+    exit;
+  if (typ.Def[1]<>'(') then exit;
+//fake pointer - decrement all ptr levels by 1
+  pn := typ.typeName(False);
+  ppn := 'P' + pn;
+  while True do begin
+    psym := Globals.getType(ppn);
+    if psym = nil then
+      break;
+    psym.fShown := True;
+    WriteLn(';'); //finish proc type
+    //Write(PSym.name + ' = {no-ptr} ' + pn); // typ.typeName(False));
+    Write(PSym.name + ' = ' + pn);
+    pn := '^' + pn;
+    ppn := 'P' + ppn;
+  end;
 end;
 
 procedure TToPas.WritePointer;
@@ -1539,11 +1558,7 @@ var
     nsym := tsym.StructName;
     psym := tsym.StructPtr;
     s := tsym.typeName(False);
-    WriteLn('//show '+tsym.name + ' ' + s + ' ' + tsym.ptrName(False));
-  (* included!
-    if (Length(s) > 2) and (s[2] = ':') then
-      s[2] := '_';
-  *)
+//WriteLn('//show '+tsym.name + ' ' + s + ' ' + tsym.ptrName(False));
     //if esu in ['S', 'U'] then begin
     if showFwdPtr then begin
     //always show ptr
@@ -1771,8 +1786,7 @@ begin
   if (pe[0] = 'v') then
     Write('procedure ')
   else
-    Write('function ');
-  //s := proc.UniqueName;
+    Write('function  ');
   Write(proc.UniqueName + '(');
   //pc := PChar(CurDef);
   if pc^ = '(' then begin
