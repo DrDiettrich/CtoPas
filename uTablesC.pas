@@ -855,14 +855,18 @@ begin
   DelphiType('LargeInteger', 'L');
   DelphiType('ULargeInteger', '+L');
 
+  DelphiType('Byte', '+c'); //equiv BYTE
+  DelphiType('Word', '+s'); //eqiv WORD
+  //DelphiType('DWORD', '???'); //eqiv DWORD
+
+  DelphiType('float', 'f');
+  DelphiType('double', 'd');
+  DelphiType('extended', 'D');
+
   Globals.defType('char', 'c', 0);
   Globals.defType('wchar_t', 'w', 0);
   Globals.defType('int', 'i', 0);
-{
-  Globals.defType('float', 'f', 0);
-  Globals.defType('double', 'd', 0);
-  Globals.defType('extended', 'D', 0);
-}
+
   DSizedTypes;
 end;
 

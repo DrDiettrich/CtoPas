@@ -98,6 +98,7 @@ uses
 function TDupeList.AddKey(const s: string): integer;
 begin
   Result := FList.Add(s, False);  //no dupes here
+  KeyCnt := Result;
 end;
 
 function TDupeList.AddSym(sym: TSymbolC): integer;
@@ -125,7 +126,8 @@ begin
     and (sym.kind = stTypedef)
     and (tsym.kind = stTypeDef) then begin
     //check for equal Def
-      if tsym.Def = sym.Def then begin
+      if (tsym.Def = sym.Def)
+      or (CompareText(tsym.name, unQuoteType(sym.def))=0) then begin
         sym.DupeCount := tsym.DupeCount;
         sym.fShown := True; //assume tsym shown before
         exit;
