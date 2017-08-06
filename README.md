@@ -1,7 +1,7 @@
 # CtoPas
 C to Pascal source code converter
 
-This is the revival of a project of 2004, documentation deserves updates.
+This is the revival of a project of 2004, see the Wiki for details.
 
 WinToPas is a Delphi(7) GUI project, to create D7 units from C source files (*.c, *.h). 
 
