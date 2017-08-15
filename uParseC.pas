@@ -472,11 +472,7 @@ const
 
   Prio: array[binops] of ePrio = (
   //operators - sorted within lines
-{$IF __opMul}
     prBinAnd, prLet, prLogAnd,  //opAmpersAnd, letAND, logAND, // & &= &&, ambiguous: &
-{$ELSE}
-    prBinAnd, prLet, prLogAnd,  //binAnd_, letAND, logAND, // & &= &&, ambiguous: &
-{$IFEND}
     prAdd, prLet, prPost, //opADD, letADD, opINC,   // + += ++
     prRel, prRel, prShift, prLet, //opLT, opLE, opSHL, letSHL, // < <= << <<=
     prRel, prRel, prShift, prLet, //opGT, opGE, opSHR, letSHR, // > >= >> >>=
@@ -505,11 +501,7 @@ const
   //not in op1$
     prPost, prErr, //opDot, op3Dot, // . ..., C++: .*
     prMul, prLet, prErr, //opDiv, letDiv, OpDivDiv, // / /= //     {RP}
-{$IF __opMul}
     prAdd, prLet, prPost, prPost //opSub0, letSub, opDec, opTo, // - -= -- ->, C++: ->*
-{$ELSE}
-    prAdd, prLet, prPost, prPost //opSub_, letSub, opDec, opTo, // - -= -- ->, C++: ->*
-{$IFEND}
   );
 
   function  bin_expr(leftOp: ePrio): string;

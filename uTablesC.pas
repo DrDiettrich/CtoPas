@@ -1537,11 +1537,11 @@ begin //MacroFilter
       begin //preserve format information
         if iaBase16 in t.attrs then begin
         //hex number
-          CSym := self.defConst(mac.name, '#', HexPrefix + IntToHex(t.lval, 0));
+          CSym := self.defConst(mac.name, '#', HexPrefix + IntToHex(t.ival, 0));
         end else if iaBase8 in t.attrs then begin
-          CSym := self.defConst(mac.name, '#', IntToOct(t.lval));
+          CSym := self.defConst(mac.name, '#', IntToOct(t.ival));
         end else begin
-          CSym := self.defConst(mac.name, '#', IntToStr(t.lval));
+          CSym := self.defConst(mac.name, '#', IntToStr(t.ival));
         end;
       end;
     t_flt:  CSym := self.defConst(mac.name, '#', FloatToStr(t.d));

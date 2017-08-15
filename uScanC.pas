@@ -55,7 +55,7 @@ function  TokenString(fFirst: boolean = False; strcvt: TStrCvt = nil): string; /
 //preprocessing
 function nextNoWhite: eToken;
 //internal
-function  const_expressionC(fSkip: integer = 0): integer;
+function  const_expressionC(fSkip: integer = 0): int64;
 
 // -------------- low level, internals --------------
 
@@ -362,8 +362,15 @@ begin
     else
       Result := AnsiToC(TokenText(ScanToken),
         delims[ScanToken.kind], taLong in ScanToken.attrs);
-  t_int:
-    Result := IntToStr(ScanToken.ival);
+  t_Lint,
+  t_int: { TODO 1 : preserve original number literal }
+    if iaBase16 in ScanToken.attrs then
+      //Result := HexPrefix + IntToHex(ScanToken.ival)
+      Result := '0x' + IntToHex(ScanToken.ival,1)
+    else if iaBase8 in ScanToken.attrs then
+      Result := IntToOct(ScanToken.ival)
+    else
+      Result := IntToStr(ScanToken.ival);
   t_sym, t_symNX:
     Result := Symbols.Strings[ScanToken.symID];
 {argument handling is up to the caller!
@@ -489,7 +496,7 @@ end;
 *)
 //function const_expression(fPre: boolean; fSkip: integer): integer;
 //function const_expression(fSkip: integer): integer;
-function const_expressionC(fSkip: integer): integer;
+function const_expressionC(fSkip: integer): int64;
 var
   i_ttyp: eToken;
 
@@ -573,7 +580,8 @@ unary_operator unary_expression
 "sizeof" unary_expression
 "sizeof" "(" type_name ")"
 *)
-  function unary_expression: integer; // + - ! ~ ()
+  //function unary_expression: integer; // + - ! ~ ()
+  function unary_expression: Int64; // + - ! ~ ()
   begin
     case i_TTYP of
     t_eof,  //means real end of input, all files processed
@@ -676,7 +684,7 @@ unary_expression
 //NOT const! "(" type_name ")" cast_expression
 
 *)
-  function multiplicative_expression: integer; // * / %
+  function multiplicative_expression: int64; // * / %
   var
     d: integer;
   begin
@@ -717,7 +725,7 @@ unary_expression
 additive_expression :
 multiplicative_expression {("+" | "-") multiplicative_expression}
 *)
-  function additive_expression: integer; // + -
+  function additive_expression: int64; // + -
   begin
     Result  := multiplicative_expression ;
     WHILE True do begin
@@ -746,7 +754,7 @@ multiplicative_expression {("+" | "-") multiplicative_expression}
 shift_expression :
 additive_expression {("<<" | ">>") additive_expression}
 *)
-  function shift_expression: integer; // << >>
+  function shift_expression: int64; // << >>
   begin
     Result  := additive_expression ;
     WHILE True do begin
@@ -771,7 +779,7 @@ additive_expression {("<<" | ">>") additive_expression}
 relational_expression :
 shift_expression {("<" | ">" | "<=" | ">=") shift_expression}
 *)
-  function  relational_expression: integer;
+  function  relational_expression: int64;
   begin
     Result := shift_expression;
     while True do begin
@@ -805,7 +813,7 @@ shift_expression {("<" | ">" | "<=" | ">=") shift_expression}
 equality_expression :
 relational_expression {("==" | "!=") relational_expression}
 *)
-  function equality_expression: integer; // == !=
+  function equality_expression: int64; // == !=
   begin
     Result  := relational_expression;
     WHILE True do begin
@@ -830,7 +838,7 @@ relational_expression {("==" | "!=") relational_expression}
 AND_expression :
 equality_expression {"&" equality_expression}
 *)
-  function AND_expression: integer; // &
+  function AND_expression: int64; // &
   begin
     Result  := equality_expression ;
 {$IF __opMul}
@@ -847,7 +855,7 @@ equality_expression {"&" equality_expression}
 exclusive_OR_expression :
 AND_expression {"^" AND_expression}
 *)
-  function exclusive_OR_expression: integer; // ^
+  function exclusive_OR_expression: int64; // ^
   begin
     Result  := AND_expression;
     WHILE i_TTYP  = opXor  do begin
@@ -860,7 +868,7 @@ AND_expression {"^" AND_expression}
 inclusive_OR_expression :
 exclusive_OR_expression {"|" exclusive_OR_expression}
 *)
-  function  inclusive_OR_expression: integer;
+  function  inclusive_OR_expression: int64;
   begin
     Result := exclusive_OR_expression;
     while i_ttyp = binOR do begin
@@ -873,7 +881,7 @@ exclusive_OR_expression {"|" exclusive_OR_expression}
 logical_AND_expression :
 inclusive_OR_expression {"&&" inclusive_OR_expression}
 *)
-  function  logical_AND_expression: integer;
+  function  logical_AND_expression: int64;
   begin
     Result := inclusive_OR_expression;
     while i_ttyp = logAnd do begin
@@ -893,7 +901,7 @@ inclusive_OR_expression {"&&" inclusive_OR_expression}
 logical_OR_expression :
 logical_AND_expression {"||" logical_AND_expression}
 *)
-  function  logical_OR_expression: integer;
+  function  logical_OR_expression: int64;
   begin
     Result := logical_AND_expression;
     while i_ttyp = logOr do begin

@@ -57,16 +57,16 @@ OFF
 ON
   Untagged structures are unnamed until really required.
   The first following typename will become the struct name.
-*)
 const __delayTags = False; // True; //{$DEFINE __delayTags}
+*)
 
 (* extStorage - use extended storage specifiers?
 Introduced 05-2006
   Problem: creation of struct members - symbols not normally to be created!
   extStorage includes inline and struct/union/enum in the allowed storage class.
   Must propagate into proc def - no sym if no scope given!
-*)
 const __extStorage = False; // {.$DEFINE __extStorage}
+*)
 
 (* ExprTerm - are expressions terminated, or separated?
 Introduced 05-2006.
@@ -82,6 +82,8 @@ NO MORE USED!
 Introduced 07-2004.
   nextToken() and nextRaw() functions with mode and filter arguments.
   Common filter function replaces nextNoEof, nextNoWhite etc.
+
+  Must be True, else compilation errors!
 *)
 const __Filter = True; //{$DEFINE __Filter}
 

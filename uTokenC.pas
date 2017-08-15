@@ -402,8 +402,13 @@ type
     t_car:  (dummy: array[1..3] of byte; chars: string[4]);
     //t_num,
     t_rem:  (uval, cval: cardinal);  //cval overlays chars in t_car.chars
+  {$IFDEF old}
     t_int:  (ival: integer);
     t_Lint: (lval: int64);
+  {$ELSE}
+    t_int:  (ival: int64);
+    t_Lint: (lval: int64);
+  {$ENDIF}
     t_flt:  (d: extended);  //longest argument - use float table?
     t_sym, t_symNX: (symID, typeID: integer); //dict. index
       //symID -> Symbols, typeID -> Types, ruleID -> Rules

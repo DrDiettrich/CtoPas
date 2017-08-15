@@ -680,15 +680,21 @@ begin //ExpressionString
     begin
       if iaBase16 in ScanToken.attrs then begin
       //prefix hex numbers with '$' (OPL hex format)?
+      {$IFDEF old}
         if i_ttyp = t_int then
           Result := '$' + IntToHex(ScanToken.uval, 0)
         else  //t_Lint (int64)
+      {$ELSE}
+      {$ENDIF}
           Result := '$' + IntToHex(ScanToken.lval, 0);
       end else begin
       //no octal format!
+      {$IFDEF old}
         if i_ttyp = t_int then
           Result := IntToStr(ScanToken.uval)
         else
+      {$ELSE}
+      {$ENDIF}
           Result := IntToStr(ScanToken.lval)
       end;
       nextToken;
